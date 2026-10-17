@@ -132,16 +132,18 @@ the whole chain (configure → build → test → package as appropriate):
 |--------------|-------------------------------------------------------------------------|
 | `dev`        | Debug configure + build + test (the day-to-day loop)                    |
 | `full`       | Coverage configure + build + test + gcovr report                        |
-| `release`    | Release configure + build + test + DEB package                          |
+| `release`    | Release configure + build + test + DEB package (clean, no hash)          |
+| `package-debug` | Debug configure + build + test + DEB (daily deploy/debug, hash-tagged) |
 | `sanitize`   | ASan + UBSan configure + build + test                                    |
 | `docs`       | Doxygen + OpenAPI HTML render                                            |
 | `bench`      | Build Google Benchmark executable                                       |
 | `ci-lint`    | clang-tidy analysis (the `tidy` configure preset sets `CMAKE_CXX_CLANG_TIDY`) |
 
 ```bash
-cmake --workflow dev          # quick local loop
-cmake --workflow release      # produces build/release/rtos-manager-<ver>-Release-<arch>-<hash>.deb
-cmake --workflow full         # coverage HTML at build/coverage/index.html
+cmake --workflow dev            # quick local loop
+cmake --workflow release        # → build/release/rtos-manager-<ver>-<arch>.deb  (clean, no hash)
+cmake --workflow package-debug  # → build/debug/rtos-manager-<ver>-Debug-<branch>-<hash>[-dirty]-<arch>.deb
+cmake --workflow full           # coverage HTML at build/coverage/index.html
 ```
 
 Configure presets available: `debug`, `release`, `relwithdebinfo`, `coverage`,
@@ -189,8 +191,16 @@ swap in a `{{baseUrl}}` Hoppscotch environment variable) as needed.
 (`preinst` / `postinst` / `prerm` / `postrm`) — installing the package
 automatically enables and restarts the service:
 
+The **artifact name encodes the build type** so a debug build can never be
+confused with (or overwrite) a release package:
+
+| Build | Command | Artifact name |
+|-------|---------|---------------|
+| Release | `cmake --workflow release` | `rtos-manager-<ver>-<arch>.deb` (clean, **no hash**) |
+| Debug (daily) | `cmake --workflow package-debug` | `rtos-manager-<ver>-Debug-<branch>-<hash>[-dirty]-<arch>.deb` |
+
 ```bash
-cmake --workflow release
+cmake --workflow release            # or: cmake --workflow package-debug
 sudo dpkg -i build/release/rtos-manager-*.deb
 systemctl status rtos-manager
 ```
