@@ -1,0 +1,15 @@
+#!/bin/sh
+# preinst — runs before the new package's files are unpacked.
+# Stops any running instance so the binary swap doesn't fail with ETXTBSY.
+set -e
+
+SERVICE="@RTOS_SERVICE_NAME@"
+
+if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet "${SERVICE}"; then
+        echo "rtos-manager: stopping running ${SERVICE} before upgrade..."
+        systemctl stop "${SERVICE}" || true
+    fi
+fi
+
+exit 0

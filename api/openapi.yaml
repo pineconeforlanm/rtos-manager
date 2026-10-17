@@ -1,0 +1,81 @@
+# ============================================================================
+#  rtos-manager HTTP API contract — OpenAPI 3.1
+#
+#  Single source of truth for the public REST surface. The CMake `openapi`
+#  target lints this file and renders HTML docs to <build>/openapi/.
+#  Keep the paths/schemas here in lock-step with src/http_server.cc.
+#
+#  MVP: exactly one endpoint — GET /api/v1/version.
+# ============================================================================
+openapi: 3.1.0
+info:
+  title: rtos-manager HTTP API
+  version: 0.1.0
+  summary: Minimal control plane for managing RTOS devices over HTTP.
+  description: |
+    Endpoints exposed by `rtos-manager` (coro_http backend).
+    The MVP surface is a single read-only version probe; it is intentionally
+    unauthenticated. Device-control endpoints will introduce security schemes
+    as the auth model lands (see CONTRIBUTING.md -> release process).
+  contact:
+    name: rtos-manager
+    url: https://github.com/pineconeforlanm/rtos-manager
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: http://{host}:{port}
+    variables:
+      host: { default: '0.0.0.0' }
+      port: { default: '8080' }
+
+tags:
+  - name: meta
+    description: Service identification and build metadata.
+
+paths:
+  /api/v1/version:
+    get:
+      tags: [meta]
+      summary: Build / version metadata baked into the binary at configure time
+      operationId: getVersion
+      security: []                  # MVP: endpoint is intentionally public.
+      responses:
+        '200':
+          description: Build metadata document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionInfo'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+
+components:
+  responses:
+    MethodNotAllowed:
+      description: The endpoint exists but the HTTP verb is unsupported.
+      content:
+        text/plain:
+          schema: { type: string, example: 'method not allowed' }
+
+  schemas:
+    VersionInfo:
+      type: object
+      required:
+        [project, version, gitHash, branch, tag, dirty, buildType,
+         buildTime, system, processor, compiler, cxxStandard]
+      properties:
+        project:     { type: string,  example: rtos_manager }
+        version:     { type: string,  example: '0.1.0', description: 'Semver from git tag (or project VERSION fallback).' }
+        gitHash:     { type: string,  example: 'a1b2c3d4e5f6...' }
+        branch:      { type: string,  example: develop }
+        tag:         { type: string,  example: v0.1.0 }
+        describe:    { type: string,  example: v0.1.0-3-gabcdef }
+        dirty:       { type: boolean, example: false }
+        prerelease:  { type: boolean, example: false }
+        buildType:   { type: string,  enum: [Debug, Release, RelWithDebInfo, MinSizeRel] }
+        buildTime:   { type: string,  format: date-time }
+        system:      { type: string,  example: Linux }
+        processor:   { type: string,  example: x86_64 }
+        compiler:    { type: string,  example: 'GNU 16.2.0' }
+        cxxStandard: { type: string,  example: '26' }

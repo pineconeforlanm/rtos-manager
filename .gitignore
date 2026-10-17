@@ -23,7 +23,6 @@
 *.dll
 *.so.*
 
-
 # Fortran module files
 *.mod
 *.smod
@@ -39,12 +38,20 @@
 *.out
 *.app
 
+# Debug information files
+*.dwo
+
+# ---------------------------------------------------------------------------
 # Build directories
+# ---------------------------------------------------------------------------
 build/
 Build/
 build-*/
+cmake-build-*/
 
+# ---------------------------------------------------------------------------
 # CMake generated files
+# ---------------------------------------------------------------------------
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
@@ -52,7 +59,47 @@ Makefile
 install_manifest.txt
 compile_commands.json
 
-# Temporary files
+# Generated headers (version_info.hpp lives under build/generated)
+generated/
+
+# Stray configure_file() outputs must never land in the source root — they
+# belong under <build>/generated/. Guard against regressions.
+/rtos-manager.service
+/rtos-manager.version
+
+# ---------------------------------------------------------------------------
+# Conan 2
+# ---------------------------------------------------------------------------
+conanbuild.*
+conanfile.*.env
+conan_toolchain.cmake
+CMakeUserPresets.json
+
+# ---------------------------------------------------------------------------
+# Coverage (gcov / gcovr)
+# ---------------------------------------------------------------------------
+coverage/
+*.gcda
+*.gcno
+*.gcov
+*.info
+
+# ---------------------------------------------------------------------------
+# Documentation output (Doxygen)
+# ---------------------------------------------------------------------------
+docs/html/
+
+# ---------------------------------------------------------------------------
+# Test output & caches
+# ---------------------------------------------------------------------------
+Testing/
+.cache/
+
+# ---------------------------------------------------------------------------
+# Editors / temp
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
 *.tmp
 *.log
 *.bak
@@ -60,10 +107,3 @@ compile_commands.json
 
 # vcpkg
 vcpkg_installed/
-
-# debug information files
-*.dwo
-
-# test output & cache
-Testing/
-.cache/

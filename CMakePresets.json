@@ -1,0 +1,271 @@
+{
+  "version": 11,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 31,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "conan-base",
+      "hidden": true,
+      "description": "Conan 2 dependencies are resolved automatically at configure time via conan_provider.cmake (no manual `conan install` needed).",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_PROJECT_TOP_LEVEL_INCLUDES": "${sourceDir}/conan_provider.cmake"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug (Conan)",
+      "inherits": "conan-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RTOS_ENABLE_TESTS": "ON",
+        "RTOS_ENABLE_EXAMPLES": "ON",
+        "RTOS_ENABLE_WARNINGS_AS_ERRORS": "OFF"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (Conan)",
+      "inherits": "conan-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RTOS_ENABLE_TESTS": "ON",
+        "RTOS_ENABLE_EXAMPLES": "OFF",
+        "RTOS_ENABLE_WARNINGS_AS_ERRORS": "ON",
+        "RTOS_ENABLE_LTO": "ON"
+      }
+    },
+    {
+      "name": "relwithdebinfo",
+      "displayName": "RelWithDebInfo (optimized + symbols)",
+      "inherits": "conan-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "RTOS_ENABLE_TESTS": "ON",
+        "RTOS_ENABLE_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Coverage (Debug + gcov/gcovr)",
+      "inherits": "conan-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RTOS_ENABLE_TESTS": "ON",
+        "RTOS_ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "docs",
+      "displayName": "Documentation build (Doxygen + OpenAPI)",
+      "inherits": "conan-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RTOS_ENABLE_TESTS": "OFF",
+        "RTOS_ENABLE_DOCS": "ON"
+      }
+    },
+    {
+      "name": "bench",
+      "displayName": "Benchmarks (Release + Google Benchmark)",
+      "inherits": "conan-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "RTOS_ENABLE_TESTS": "OFF",
+        "RTOS_ENABLE_BENCH": "ON",
+        "RTOS_ENABLE_WARNINGS_AS_ERRORS": "OFF"
+      }
+    },
+    {
+      "name": "asan-ubsan",
+      "displayName": "AddressSanitizer + UndefinedBehaviorSanitizer",
+      "inherits": "debug",
+      "cacheVariables": {
+        "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+      }
+    },
+    {
+      "name": "tsan",
+      "displayName": "ThreadSanitizer",
+      "inherits": "debug",
+      "cacheVariables": {
+        "CMAKE_C_FLAGS": "-fsanitize=thread",
+        "CMAKE_CXX_FLAGS": "-fsanitize=thread",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread"
+      }
+    },
+    {
+      "name": "tidy",
+      "displayName": "clang-tidy analysis build",
+      "inherits": "debug",
+      "cacheVariables": {
+        "RTOS_ENABLE_TESTS": "ON",
+        "RTOS_ENABLE_WARNINGS_AS_ERRORS": "OFF",
+        "CMAKE_CXX_CLANG_TIDY": "clang-tidy;--warnings-as-errors=*"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "debug",     "configurePreset": "debug",     "jobs": 0 },
+    { "name": "release",   "configurePreset": "release",   "jobs": 0 },
+    { "name": "relwithdebinfo", "configurePreset": "relwithdebinfo", "jobs": 0 },
+    { "name": "coverage",  "configurePreset": "coverage",  "jobs": 0 },
+    { "name": "bench",     "configurePreset": "bench",     "jobs": 0 },
+    { "name": "asan-ubsan","configurePreset": "asan-ubsan","jobs": 0 },
+    { "name": "tsan",      "configurePreset": "tsan",      "jobs": 0 },
+    { "name": "tidy",      "configurePreset": "tidy",      "jobs": 0 },
+    {
+      "name": "docs",
+      "configurePreset": "docs",
+      "jobs": 0,
+      "targets": ["docs"]
+    },
+    {
+      "name": "coverage-report",
+      "configurePreset": "coverage",
+      "jobs": 0,
+      "targets": ["coverage"]
+    },
+    {
+      "name": "openapi",
+      "configurePreset": "docs",
+      "targets": ["openapi"]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": true }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": true }
+    },
+    {
+      "name": "relwithdebinfo",
+      "configurePreset": "relwithdebinfo",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": true }
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": true }
+    },
+    {
+      "name": "asan-ubsan",
+      "configurePreset": "asan-ubsan",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": true }
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "stopOnFailure": true }
+    }
+  ],
+  "packagePresets": [
+    {
+      "name": "deb-base",
+      "hidden": true,
+      "generators": ["DEB"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "deb-release",
+      "inherits": "deb-base",
+      "configurePreset": "release"
+    },
+    {
+      "name": "deb-debug",
+      "inherits": "deb-base",
+      "configurePreset": "debug",
+      "configurations": ["Debug"]
+    },
+    {
+      "name": "deb-relwithdebinfo",
+      "inherits": "deb-base",
+      "configurePreset": "relwithdebinfo",
+      "configurations": ["RelWithDebInfo"]
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "dev",
+      "displayName": "Day-to-day dev loop (configure → build → test, Debug)",
+      "steps": [
+        { "type": "configure", "name": "debug" },
+        { "type": "build",     "name": "debug" },
+        { "type": "test",      "name": "debug" }
+      ]
+    },
+    {
+      "name": "full",
+      "displayName": "Full local pipeline (coverage build + tests + gcovr report)",
+      "steps": [
+        { "type": "configure", "name": "coverage" },
+        { "type": "build",     "name": "coverage" },
+        { "type": "test",      "name": "coverage" },
+        { "type": "build",     "name": "coverage-report" }
+      ]
+    },
+    {
+      "name": "release",
+      "displayName": "Release build → tests → DEB package",
+      "steps": [
+        { "type": "configure", "name": "release" },
+        { "type": "build",     "name": "release" },
+        { "type": "test",      "name": "release" },
+        { "type": "package",   "name": "deb-release" }
+      ]
+    },
+    {
+      "name": "sanitize",
+      "displayName": "ASan + UBSan regression sweep",
+      "steps": [
+        { "type": "configure", "name": "asan-ubsan" },
+        { "type": "build",     "name": "asan-ubsan" },
+        { "type": "test",      "name": "asan-ubsan" }
+      ]
+    },
+    {
+      "name": "docs",
+      "displayName": "Doxygen + OpenAPI documentation build",
+      "steps": [
+        { "type": "configure", "name": "docs" },
+        { "type": "build",     "name": "docs" },
+        { "type": "build",     "name": "openapi" }
+      ]
+    },
+    {
+      "name": "bench",
+      "displayName": "Build and run micro-benchmarks",
+      "steps": [
+        { "type": "configure", "name": "bench" },
+        { "type": "build",     "name": "bench" }
+      ]
+    },
+    {
+      "name": "ci-lint",
+      "displayName": "Static analysis (clang-format check + clang-tidy)",
+      "steps": [
+        { "type": "configure", "name": "tidy" },
+        { "type": "build",     "name": "tidy" }
+      ]
+    }
+  ]
+}

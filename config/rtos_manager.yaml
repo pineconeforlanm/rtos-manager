@@ -1,0 +1,20 @@
+# rtos-manager configuration
+# Parsed at startup by Glaze (compile-time reflection: keys map 1:1 to the
+# members of rtos_manager::AppConfig in include/rtos_manager/config.hpp).
+# Any key omitted here falls back to the default declared in that struct.
+
+# level: trace|debug|info|warning|error|critical
+# file:  empty string disables the file sink
+# max_size: rotate once the file exceeds N bytes (10 MiB)
+# max_files: keep at most N rotated files
+server:
+  host: 0.0.0.0
+  port: 8080
+  io_threads: 1
+
+logging:
+  level: info
+  file: logs/rtos-manager.log
+  max_size: 10485760
+  max_files: 5
+  console: true
