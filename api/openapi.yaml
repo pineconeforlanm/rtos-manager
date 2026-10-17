@@ -65,17 +65,27 @@ components:
         [project, version, gitHash, branch, tag, dirty, buildType,
          buildTime, system, processor, compiler, cxxStandard]
       properties:
-        project:     { type: string,  example: rtos_manager }
-        version:     { type: string,  example: '0.1.0', description: 'Semver from git tag (or project VERSION fallback).' }
-        gitHash:     { type: string,  example: 'a1b2c3d4e5f6...' }
-        branch:      { type: string,  example: develop }
-        tag:         { type: string,  example: v0.1.0 }
-        describe:    { type: string,  example: v0.1.0-3-gabcdef }
-        dirty:       { type: boolean, example: false }
-        prerelease:  { type: boolean, example: false }
-        buildType:   { type: string,  enum: [Debug, Release, RelWithDebInfo, MinSizeRel] }
-        buildTime:   { type: string,  format: date-time }
-        system:      { type: string,  example: Linux }
-        processor:   { type: string,  example: x86_64 }
-        compiler:    { type: string,  example: 'GNU 16.2.0' }
-        cxxStandard: { type: string,  example: '26' }
+        project:      { type: string,  example: rtos_manager }
+        description:  { type: string,  example: 'An HTTP service for managing RTOS devices.' }
+        homepage:     { type: string,  format: uri, example: 'https://github.com/pineconeforlanm/rtos-manager' }
+        version:      { type: string,  example: '0.1.0', description: 'Semver from git tag (or project VERSION fallback).' }
+        major:        { type: integer, example: 0 }
+        minor:        { type: integer, example: 1 }
+        patch:        { type: integer, example: 0 }
+        preRelease:   { type: string,  example: '', description: 'alpha|beta|rc, or empty for a stable release.' }
+        prerelease:   { type: boolean, example: false }
+        gitHash:      { type: string,  example: 'a1b2c3d4e5f6...' }
+        gitShortHash: { type: string,  example: a1b2c3d }
+        branch:       { type: string,  example: develop }
+        tag:          { type: string,  example: v0.1.0 }
+        describe:     { type: string,  example: v0.1.0-3-gabcdef }
+        commitCount:  { type: integer, example: 42 }
+        commitDate:   { type: string,  format: date-time, example: '2026-10-17T13:16:47+08:00' }
+        dirty:        { type: boolean, example: false }
+        buildType:    { type: string,  enum: [Debug, Release, RelWithDebInfo, MinSizeRel] }
+        buildTime:    { type: string,  example: '2026-10-17 13:16:47', description: 'UTC build timestamp (%Y-%m-%d %H:%M:%S).' }
+        system:       { type: string,  example: Linux }
+        systemVersion: { type: string, example: '6.8.0-40-generic' }
+        processor:    { type: string,  example: x86_64 }
+        compiler:     { type: string,  example: 'GNU 16.2.0' }
+        cxxStandard:  { type: string,  example: '26' }

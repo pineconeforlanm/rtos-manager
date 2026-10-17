@@ -234,6 +234,16 @@
       ]
     },
     {
+      "name": "package-debug",
+      "displayName": "Debug build → tests → DEB (daily deploy/debug artifact, hash-tagged)",
+      "steps": [
+        { "type": "configure", "name": "debug" },
+        { "type": "build",     "name": "debug" },
+        { "type": "test",      "name": "debug" },
+        { "type": "package",   "name": "deb-debug" }
+      ]
+    },
+    {
       "name": "sanitize",
       "displayName": "ASan + UBSan regression sweep",
       "steps": [

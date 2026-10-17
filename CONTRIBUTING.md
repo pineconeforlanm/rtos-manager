@@ -41,23 +41,48 @@ hotfix/<version>-<short-desc>   e.g. hotfix/0.2.1-fix-port-bind
 
 ---
 
-## Day-to-day workflow
+## Day-to-day workflow (feature branch → squash → PR → develop)
+
+Every change reaches `develop` through a short-lived `feature/*` branch and a
+pull request. Keep history readable: commit freely while working, then
+**squash into a few Conventional Commits before opening the PR**.
 
 ```bash
-# Start a feature from develop
-git checkout develop
-git pull
+# 1. Branch off develop
+git checkout develop && git pull
 git checkout -b feature/RTOS-20-tls-support
 
-# ... commit locally (see commit conventions below) ...
+# 2. Work — commit as often as you like (wip / fix / ... are fine locally)
+git commit -m "wip: sketch tls context"
+git commit -m "fix: leak on error path"
 
-# Push and open a PR against develop
+# 3. Stay in sync with develop by REBASING (not merging) -> linear history
+git fetch origin && git rebase origin/develop
+
+# 4. Tidy: squash / reword into Conventional Commits before review
+git rebase -i origin/develop      # squash/fixup/reword -> e.g. feat(http): ...
+
+# 5. Push and open a PR against develop
 git push -u origin feature/RTOS-20-tls-support
+
+# 6. After the PR is merged, retire the branch
+git checkout develop && git pull
+git branch -d feature/RTOS-20-tls-support
+git push origin --delete feature/RTOS-20-tls-support
 ```
 
-Keep `develop` always releasable-green: before merging, run the full pipeline
-locally — `cmake --workflow full` (build + tests + coverage). There is no hosted
-CI; every gate is a local `cmake --workflow` / `--target` command.
+### Rules
+
+- **Squash before the PR, not after.** Once reviewers start commenting, do **not**
+  rewrite the pushed history. Address feedback with new commits (or
+  `git commit --fixup=<sha>` + `git rebase --autosquash`) and force-update only
+  with `git push --force-with-lease` (never bare `--force`).
+- **PR merge strategy:** use a normal *merge* to keep the feature's several
+  Conventional Commits (git-cliff turns each into a CHANGELOG line). Use GitHub's
+  *Squash and merge* only for a single tiny change.
+- Keep `develop` always releasable-green: before merging, run the full pipeline
+  locally — `cmake --workflow full` (build + tests + coverage). There is no hosted
+  CI; every gate is a local `cmake --workflow` / `--target` command.
 
 ---
 
@@ -82,6 +107,27 @@ docs(readme): document coverage preset
 ```
 
 A `BREAKING CHANGE:` footer (or `!` after the type) signals a major bump.
+
+---
+
+## Packaging (DEB) & artifacts
+
+CPack produces two artifact flavours and the **file name encodes how the build
+should be treated**, so a throwaway debug build can never masquerade as (or
+overwrite) a release package:
+
+| Build | One command | Artifact name |
+|-------|-------------|---------------|
+| **Release** (对外发布) | `cmake --workflow release` | `rtos-manager-<semver>-<arch>.deb` — clean, **no hash** |
+| **Debug** (日常部署/调试) | `cmake --workflow package-debug` | `rtos-manager-<semver>-Debug-<branch>-<hash>[-dirty]-<arch>.deb` — traceable |
+| RelWithDebInfo | `cmake --workflow release` 改配 preset / `cpack --preset deb-relwithdebinfo` | `rtos-manager-<semver>-RelWithDebInfo-<arch>.deb` |
+
+- The **debug** name carries branch (truncated to 20 chars) + short commit hash
+  and a `-dirty` marker when the working tree is uncommitted, so a build is
+  always traceable to a commit.
+- Every package installs `/etc/version/rtos-manager.version` with full metadata
+  (semver, `git describe`, commit, branch, tag, dirty, build type/time, compiler,
+  arch); `rtos-manager --version` prints the same data baked into the binary.
 
 ---
 
@@ -126,14 +172,21 @@ git checkout main
 git merge --no-ff release/0.2.0
 git tag -a v0.2.0 -m "Release 0.2.0"
 
-# 5. Back-merge into develop and retire the release branch
+# 5. Back-merge MAIN into develop (this is what carries the tag), retire the branch
 git checkout develop
-git merge --no-ff release/0.2.0
+git merge --no-ff main          # merge main, NOT release/0.2.0 — the tag sits on main's merge commit
 git branch -d release/0.2.0
 
 # 6. Publish
 git push origin main develop --tags
 ```
+
+> **Why merge `main`, not the release branch?** `v0.2.0` is tagged on the merge
+> commit that step 4 creates on `main`. Back-merging only `release/0.2.0` into
+> `develop` skips that commit, so `git describe --tags` from `develop` cannot
+> find the tag — `tag` shows empty in `/api/v1/version`. Merging `main`
+> **forward** (never rewriting pushed history) makes the tag reachable from
+> `develop` and every branch cut from it.
 
 The release is produced **locally** (this project has no hosted CI). On the
 release commit / tag, run:

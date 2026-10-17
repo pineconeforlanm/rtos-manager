@@ -116,16 +116,18 @@ ctest  --preset release
 |--------------|--------------------------------------------------------------|
 | `dev`        | Debug configure + build + test（日常开发循环）               |
 | `full`       | 覆盖率 configure + build + test + gcovr 报告                 |
-| `release`    | Release configure + build + test + DEB 打包                  |
+| `release`    | Release configure + build + test + DEB 打包（干净，无 hash）  |
+| `package-debug` | Debug configure + build + test + DEB（日常部署/调试，带 hash） |
 | `sanitize`   | ASan + UBSan configure + build + test                        |
 | `docs`       | Doxygen + OpenAPI 文档渲染                                   |
 | `bench`      | 构建 Google Benchmark 可执行文件                             |
 | `ci-lint`    | clang-tidy 静态分析                                          |
 
 ```bash
-cmake --workflow dev          # 本地快速循环
-cmake --workflow release      # 产出 build/release/rtos-manager-<ver>-Release-<arch>-<hash>.deb
-cmake --workflow full         # 覆盖率 HTML 在 build/coverage/index.html
+cmake --workflow dev            # 本地快速循环
+cmake --workflow release        # → build/release/rtos-manager-<ver>-<arch>.deb（干净，无 hash）
+cmake --workflow package-debug  # → build/debug/rtos-manager-<ver>-Debug-<branch>-<hash>[-dirty]-<arch>.deb
+cmake --workflow full           # 覆盖率 HTML 在 build/coverage/index.html
 ```
 
 ### 示例（RTOS_ENABLE_EXAMPLES=ON，debug 预设默认开启）
@@ -183,8 +185,15 @@ curl -s http://127.0.0.1:8080/api/v1/version
 `/etc/version/rtos-manager.version` 文件以及四个 DEB 维护脚本
 （`preinst`/`postinst`/`prerm`/`postrm`）——安装软件包时会自动 enable + restart 服务：
 
+**产物文件名按构建类型区分**，避免临时调试包与正式发布包混淆（或互相覆盖）：
+
+| 构建 | 命令 | 产物名 |
+|------|------|--------|
+| Release | `cmake --workflow release` | `rtos-manager-<ver>-<arch>.deb`（干净，**无 hash**） |
+| Debug（日常） | `cmake --workflow package-debug` | `rtos-manager-<ver>-Debug-<branch>-<hash>[-dirty]-<arch>.deb` |
+
 ```bash
-cmake --workflow release
+cmake --workflow release            # 或：cmake --workflow package-debug
 sudo dpkg -i build/release/rtos-manager-*.deb
 systemctl status rtos-manager
 ```
