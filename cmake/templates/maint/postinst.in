@@ -1,0 +1,20 @@
+#!/bin/sh
+# postinst — runs after the new package's files are unpacked.
+# Reloads systemd, enables the unit on boot, restarts the service.
+set -e
+
+SERVICE="@RTOS_SERVICE_NAME@"
+
+# Refresh the dynamic linker cache in case we ship shared libs in unusual prefixes.
+if command -v ldconfig >/dev/null 2>&1; then
+    ldconfig || true
+fi
+
+if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+    echo "rtos-manager: configuring systemd service ${SERVICE}..."
+    systemctl daemon-reload
+    systemctl enable "${SERVICE}" || true
+    systemctl restart "${SERVICE}" || echo "rtos-manager: warning: failed to start ${SERVICE}"
+fi
+
+exit 0

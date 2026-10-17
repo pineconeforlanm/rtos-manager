@@ -1,0 +1,18 @@
+[Unit]
+Description=@PROJECT_DESCRIPTION@
+Documentation=@PROJECT_HOMEPAGE_URL@
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=@RTOS_SERVICE_BINARY@ --config @RTOS_SERVICE_CONFIG@
+Restart=on-failure
+RestartSec=5
+# Run unprivileged; create the state/log dir under the runtime path.
+DynamicUser=yes
+StateDirectory=rtos-manager
+LogsDirectory=rtos-manager
+WorkingDirectory=/var/lib/rtos-manager
+
+[Install]
+WantedBy=multi-user.target

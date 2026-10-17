@@ -1,0 +1,18 @@
+rtos-manager version info
+=========================
+Package         : @PROJECT_NAME@
+Semantic Version: @RTOS_VERSION_SEMVER@
+Major.Minor.Patch: @RTOS_VERSION_MAJOR@.@RTOS_VERSION_MINOR@.@RTOS_VERSION_PATCH@
+Pre-release     : @RTOS_VERSION_PRE_RELEASE@.@RTOS_VERSION_PRE_NUM@
+Is Pre-release  : @RTOS_VERSION_IS_PRERELEASE@
+Git Describe    : @RTOS_GIT_DESCRIBE@
+Git Commit      : @RTOS_GIT_HASH@
+Git Branch      : @RTOS_GIT_BRANCH@
+Git Tag         : @RTOS_GIT_TAG@
+Git Dirty       : @RTOS_GIT_DIRTY@
+Build Type      : @RTOS_BUILD_TYPE@
+Build Time      : @RTOS_BUILD_TIME@ UTC
+System          : @RTOS_SYSTEM_NAME@ @RTOS_SYSTEM_VER@ (@RTOS_SYSTEM_PROCESSOR@)
+Compiler        : @RTOS_COMPILER_ID@ @RTOS_COMPILER_VER@
+C++ Standard    : C++@RTOS_EFFECTIVE_CXX_STD@
+Homepage        : @PROJECT_HOMEPAGE_URL@

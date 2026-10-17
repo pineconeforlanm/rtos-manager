@@ -1,0 +1,16 @@
+#!/bin/sh
+# postrm — runs after the package's files are removed.
+# Reload systemd so the unit disappears from `systemctl list-units`.
+set -e
+
+SERVICE="@RTOS_SERVICE_NAME@"
+
+# $1 = "remove" | "purge" | "failed-upgrade" | "upgrade"
+if [ "$1" = "purge" ] || [ "$1" = "remove" ] || [ "$1" = "0" ]; then
+    if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+        systemctl daemon-reload || true
+        systemctl reset-failed "${SERVICE}" || true
+    fi
+fi
+
+exit 0

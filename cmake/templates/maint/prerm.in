@@ -1,0 +1,16 @@
+#!/bin/sh
+# prerm — runs before the package's files are removed (upgrade or purge).
+# Stop the running service so removal can replace or clean files safely.
+set -e
+
+SERVICE="@RTOS_SERVICE_NAME@"
+
+# $1 = "remove" (purge or final remove) | "upgrade" (called before new version's preinst)
+if [ "$1" = "remove" ] || [ "$1" = "deconfigure" ]; then
+    if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+        systemctl stop "${SERVICE}" || true
+        systemctl disable "${SERVICE}" || true
+    fi
+fi
+
+exit 0
