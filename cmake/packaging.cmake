@@ -79,10 +79,28 @@ endif()
 # 包内文件 FHS 根（注意是 PACKAGING 不是 PACKING，旧名拼错会让 deb 内路径回退到 /usr/local）。
 set(CPACK_PACKAGING_INSTALL_PREFIX "${RTOS_PACKAGE_PREFIX}")
 
-# 输出文件名：<name>-<semver>-<buildtype>-<arch>.deb
+# --- artifact file name (build-type aware) ---------------------------------
+# Release          : 干净、可对外分发，不带 hash 尾缀
+#                    rtos-manager-<semver>-<arch>.deb
+# Debug (日常开发)  : 临时部署/调试包——含 build type / 分支 / short hash / dirty
+#                    rtos-manager-<semver>-Debug-<branch>-<hash>[-dirty]-<arch>.deb
+# 其他(如 RelWithDebInfo): 不带 hash，但标注 build type，避免与 Release 同名冲突。
 string(SUBSTRING "${RTOS_GIT_HASH_SHORT}" 0 7 _RTOS_HASH7)
-set(CPACK_PACKAGE_FILE_NAME
-    "${CPACK_PACKAGE_NAME}-${RTOS_VERSION_SEMVER}-${CMAKE_BUILD_TYPE}-${CMAKE_SYSTEM_PROCESSOR}-${_RTOS_HASH7}${RTOS_PACKAGE_DIRTYSUFFIX}")
+string(TOLOWER "${CMAKE_BUILD_TYPE}" _RTOS_BUILDTYPE_LC)
+# 分支名可能含 '/'、空格等，规整为文件名安全字符，并截断到 20 字符防止包名过长。
+string(REGEX REPLACE "[^A-Za-z0-9._+-]" "-" _RTOS_PKG_BRANCH "${RTOS_GIT_BRANCH}")
+string(SUBSTRING "${_RTOS_PKG_BRANCH}" 0 20 _RTOS_PKG_BRANCH)
+
+if(_RTOS_BUILDTYPE_LC STREQUAL "debug")
+  set(CPACK_PACKAGE_FILE_NAME
+      "${CPACK_PACKAGE_NAME}-${RTOS_VERSION_SEMVER}-Debug-${_RTOS_PKG_BRANCH}-${_RTOS_HASH7}${RTOS_PACKAGE_DIRTYSUFFIX}-${CMAKE_SYSTEM_PROCESSOR}")
+elseif(_RTOS_BUILDTYPE_LC STREQUAL "release")
+  set(CPACK_PACKAGE_FILE_NAME
+      "${CPACK_PACKAGE_NAME}-${RTOS_VERSION_SEMVER}-${CMAKE_SYSTEM_PROCESSOR}")
+else()
+  set(CPACK_PACKAGE_FILE_NAME
+      "${CPACK_PACKAGE_NAME}-${RTOS_VERSION_SEMVER}-${CMAKE_BUILD_TYPE}-${CMAKE_SYSTEM_PROCESSOR}")
+endif()
 
 # Debian 架构映射
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")

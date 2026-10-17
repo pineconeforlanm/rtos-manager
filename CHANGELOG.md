@@ -5,6 +5,32 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-10-17
+
+### Added
+- **Build-type aware DEB artifact naming** (`cmake/packaging.cmake`) — Release
+  packages are now clean `rtos-manager-<semver>-<arch>.deb` (no hash); Debug
+  packages embed build type, branch (truncated to 20 chars), short commit hash
+  and a `-dirty` marker for traceability, so a daily build can never collide
+  with (or overwrite) a release artifact.
+- **`package-debug` workflow preset** — one command
+  (`cmake --workflow package-debug`) produces a deploy/debug DEB.
+- **Full build metadata in `GET /api/v1/version`** — the JSON now serializes
+  every field baked into the binary (description, homepage, semver components,
+  git short hash, commit count/date, system version, preRelease), kept in
+  lock-step with the `VersionInfo` OpenAPI schema.
+
+### Changed
+- The release process now back-merges **`main`** (not the release branch) into
+  `develop`, so the `vX.Y.Z` tag stays reachable and `git describe` resolves it.
+- `CONTRIBUTING.md` codifies the feature-branch → squash-before-PR → merge
+  workflow and the DEB naming strategy; README (en/zh) updated to match.
+
+### Fixed
+- `v0.1.0` tag reachability from `develop` — it previously lived only on the
+  `main` merge commit, so version metadata built from a develop-based branch
+  reported an empty `tag` and a hash-only `describe`.
+
 ## [0.1.0] - 2026-10-17
 
 ### Added
@@ -59,4 +85,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the OpenAPI contract at `api/openapi.yaml` is now the live source for the
   HTTP surface.
 
+[0.1.1]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.1
 [0.1.0]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.0

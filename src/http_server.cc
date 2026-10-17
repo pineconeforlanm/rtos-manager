@@ -22,13 +22,23 @@ namespace rtos_manager {
 namespace {
 
 /// Build the JSON document served by GET /api/v1/version.
+/// Mirrors the full metadata baked into the binary (see version_info.hpp.in)
+/// so the HTTP surface is as complete as `--version` / /etc/version.
 std::string VersionJson() {
   return std::format(
-      R"({{"project":"{}","version":"{}","gitHash":"{}","branch":"{}","tag":"{}","describe":"{}","dirty":{},"prerelease":{},"buildType":"{}","buildTime":"{}","system":"{}","processor":"{}","compiler":"{} {}","cxxStandard":"{}"}})",
-      build::kProjectName, build::kVersionSemver, build::kGitHash,
-      build::kGitBranch, build::kGitTag, build::kGitDescribe, build::kGitDirty,
-      build::kVersionIsPrerelease, build::kBuildType, build::kBuildTime,
-      build::kSystemName, build::kSystemProcessor, build::kCompilerId,
+      R"({{"project":"{}","description":"{}","homepage":"{}",)"
+      R"("version":"{}","major":{},"minor":{},"patch":{},"preRelease":"{}","prerelease":{},)"
+      R"("gitHash":"{}","gitShortHash":"{}","branch":"{}","tag":"{}","describe":"{}","commitCount":{},"commitDate":"{}","dirty":{},)"
+      R"("buildType":"{}","buildTime":"{}",)"
+      R"("system":"{}","systemVersion":"{}","processor":"{}",)"
+      R"("compiler":"{} {}","cxxStandard":"{}"}})",
+      build::kProjectName, build::kProjectDescription, build::kHomepageUrl,
+      build::kVersionSemver, build::kVersionMajor, build::kVersionMinor,
+      build::kVersionPatch, build::kVersionPreRelease, build::kVersionIsPrerelease,
+      build::kGitHash, build::kGitHashShort, build::kGitBranch, build::kGitTag,
+      build::kGitDescribe, build::kGitCommitCount, build::kGitCommitDate,
+      build::kGitDirty, build::kBuildType, build::kBuildTime, build::kSystemName,
+      build::kSystemVersion, build::kSystemProcessor, build::kCompilerId,
       build::kCompilerVersion, build::kCxxStandard);
 }
 
