@@ -1,0 +1,27 @@
+# Doxyfile configuration template — configured by CMake (cmake/doxygen.cmake).
+# Only the fields that differ from Doxygen defaults are listed here.
+PROJECT_NAME           = "@PROJECT_NAME@"
+PROJECT_NUMBER         = "@PROJECT_VERSION@"
+PROJECT_BRIEF          = "@PROJECT_DESCRIPTION@"
+OUTPUT_DIRECTORY       = "@DOXYGEN_OUTPUT_DIRECTORY@"
+INPUT                  = @DOXYGEN_INPUT@
+RECURSIVE              = YES
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+WARN_IF_UNDOCUMENTED   = YES
+OPTIMIZE_OUTPUT_FOR_C  = NO
+QUIET                  = YES
+
+# --- doxygen-awesome-css theme (vendored in docs/doxygen-awesome/) ---
+HTML_EXTRA_STYLESHEET  = @DOXYGEN_HTML_EXTRA_STYLESHEET@
+
+# Theme-friendly Doxygen settings
+HAVE_DOT               = @DOXYGEN_HAVE_DOT@
+DOT_IMAGE_FORMAT       = svg
+DOT_FILE_FORMAT        = svg
+INTERACTIVE_SVG        = YES
+HTML_DYNAMIC_MENUS     = YES
+HTML_COLORSTYLE        = AUTO
+SEARCHENGINE           = YES

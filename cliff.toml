@@ -1,0 +1,117 @@
+# ============================================================================
+#  git-cliff configuration — https://git-cliff.org/docs/configuration
+#
+#  Generates CHANGELOG.md in "Keep a Changelog" format from Conventional
+#  Commits. Invoke locally:
+#      git-cliff -o CHANGELOG.md          # full history
+#      git-cliff --unreleased             # preview next release
+#      git-cliff --latest                 # only the newest tag range
+#  Or via CMake:
+#      cmake --build build/debug --target changelog
+# ============================================================================
+
+[changelog]
+# Tera template for the changelog header (printed once at the top).
+header = """
+# Changelog\n\
+\n\
+All notable changes to this project are documented here.\n\
+\n\
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n\
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\
+"""
+
+# Tera template for each release section.
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+  {% if previous %}\
+    {% if previous.version %}\
+      ([Compare](https://github.com/pineconeforlanm/rtos-manager/compare/{{ previous.version }}...{{ version }}))\
+    {% endif %}\
+  {% endif %}
+  {% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits | unique(attribute="message") %}
+      - **{{ commit.scope }}**: {{ commit.message | upper_first }}\
+        {% if commit.remote.username %} (by [@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }})){% endif %}\
+    {% endfor %}
+  {% endfor %}
+  {% if commit_parsers %}\
+  {% for commit in commits | filter(attribute="breaking", value=true) %}
+    ### BREAKING CHANGES
+      - **{{ commit.scope }}**: {{ commit.message | upper_first }}
+  {% endfor %}\
+  {% endif %}
+{% else %}\
+    ## [Unreleased]
+  {% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits | unique(attribute="message") %}
+      - **{{ commit.scope }}**: {{ commit.message | upper_first }}\
+        {% if commit.remote.username %} (by [@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }})){% endif %}\
+    {% endfor %}
+  {% endfor %}
+{% endif %}\
+"""
+
+# Remove leading and trailing whitespace from the template output.
+trim = true
+
+# Postprocessors run on the rendered template body.
+postprocessors = [
+  # Replace placeholder URL patterns with actual repo link if needed.
+]
+
+[git]
+# Parse commits against Conventional Commits specification.
+conventional_commits = true
+
+# Filter commits that don't follow the conventional format.
+filter_unconventional = false
+
+# Split a commit body line into separate conventional commits?
+split_commits = false
+
+# Commit preprocessor (applied before parsing).
+commit_preprocessors = [
+  # Replace issue numbers with links.
+  { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](https://github.com/pineconeforlanm/rtos-manager/issues/${2}))" },
+]
+
+# Commit parsers: define how types map to Keep a Changelog groups.
+commit_parsers = [
+  { message = "^feat",     group = "Added" },
+  { message = "^fix",      group = "Fixed" },
+  { message = "^docs",     group = "Documentation" },
+  { message = "^style",    group = "Changed", skip = true },
+  { message = "^refactor", group = "Changed" },
+  { message = "^perf",     group = "Performance" },
+  { message = "^test",     group = "Testing" },
+  { message = "^build",    group = "Build" },
+  { message = "^ci",       group = "CI", skip = true },
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^chore",    group = "Miscellaneous", skip = true },
+  { message = "^revert",   group = "Reverted" },
+]
+
+# Protect breaking changes from being skipped.
+protect_breaking_commits = false
+
+# Filter out the commits matched by the parsers above (skip = true).
+filter_commits = false
+
+# Regex for matching git tags (release tags).
+tag_pattern = "v[0-9].*"
+
+# Regex for skipping tags (e.g., only release tags, no RCs).
+skip_tags = ""
+
+# Ignore tags that don't match tag_pattern.
+ignore_tags = ""
+
+# Sort commits topologically (oldest tag first).
+topo_order = false
+
+# Sort commits by date within each release section.
+sort_commits = "oldest"
