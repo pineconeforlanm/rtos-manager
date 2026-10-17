@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 3.28)
 # ---------------------------------------------------------------------------
 project(
   rtos_manager
-  VERSION 0.1.0
+  VERSION 0.1.1
   DESCRIPTION "RTOS Manager — an HTTP service for managing RTOS devices"
   HOMEPAGE_URL "https://github.com/pineconeforlanm/rtos-manager"
   LANGUAGES CXX C)
