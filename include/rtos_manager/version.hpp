@@ -93,7 +93,7 @@ class BuildInfo {
   }
 
   // --- Rendering -------------------------------------------------------------
-  /// Compact single line, e.g. "0.1.1 (f683f7b on develop, dirty)".
+  /// Compact single line, e.g. "1.2.3 (abc1234 on main, dirty)".
   [[nodiscard]] auto ToString() const -> std::string;
   /// Full label-aligned report, one field per line, terminated by a newline —
   /// the `--version` output. Plain text on purpose: no log prefixes, so the

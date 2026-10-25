@@ -6,7 +6,7 @@
 <p align="center">
   <img alt="license" src="https://img.shields.io/github/license/pineconeforlanm/rtos-manager?style=flat-square">
   <img alt="language" src="https://img.shields.io/github/languages/top/pineconeforlanm/rtos-manager?style=flat-square">
-  <img alt="version" src="https://img.shields.io/badge/version-0.1.0-orange?style=flat-square">
+  <img alt="version" src="https://img.shields.io/badge/version-0.1.2-orange?style=flat-square">
   <img alt="last commit" src="https://img.shields.io/github/last-commit/pineconeforlanm/rtos-manager?style=flat-square">
 </p>
 
@@ -286,9 +286,9 @@ The package installs:
 ### Semantic versioning
 
 The version is parsed from the latest annotated Git tag matching
-`v?MAJOR.MINOR.PATCH[-(alpha|beta|rc).N]`. With no tag present, it falls
-back to `project(... VERSION 0.1.0)` declared in `CMakeLists.txt`. The
-resolved values are baked into:
+`v?MAJOR.MINOR.PATCH[-(alpha|beta|rc).N]`; with no tag reachable at all it falls
+back to the `project(... VERSION ...)` line in `CMakeLists.txt`. The resolved
+values are baked into:
 
 - `rtos_manager::BuildInfo` accessors (`BuildInfo::Get().Semver()` …), populated from the generated `constexpr` aggregate `rtos_manager::build::kMetadata` in `version_info.hpp`
 - the DEB file name: `rtos-manager-<semver>[-Debug-<branch>-<hash>[-dirty]]-<arch>.deb`
@@ -441,17 +441,21 @@ output stays greppable and diffable between builds:
 
 ```bash
 $ rtos-manager -v
-rtos_manager 0.1.2-rc.1 (c2a0dff on main)
+rtos_manager 0.1.2 (66073cb on main)
 
 $ rtos-manager --version
-rtos_manager 0.1.2-rc.1
+rtos_manager 0.1.2
   description : RTOS Manager — an HTTP service for managing RTOS devices
   homepage    : https://github.com/pineconeforlanm/rtos-manager
-  git         : v0.1.2-rc.1 [hash=c2a0dff… branch=main tag=v0.1.2-rc.1 commits=28 dirty=false date=…]
-  build       : type=Release time=2026-10-25 09:20:28 UTC
-  system      : Linux 6.18.40 (x86_64)
+  git         : v0.1.2 [hash=66073cb… branch=main tag=v0.1.2 commits=35 dirty=false date=2026-10-25T17:49:02+08:00]
+  build       : type=Release time=2026-10-25 09:49:15 UTC
+  system      : Linux 6.18.40.1-microsoft-standard-WSL2 (x86_64)
   compiler    : GNU 16.2.0 (C++26)
 ```
+
+Every field above is a property of the build, not of this document: the numbers
+come from the `v0.1.2` release artifact, and a working-copy build shows its own
+branch, hash and `dirty=true`.
 
 `-v` is the brief form ("which build am I running?", the one a post-install
 script can parse); `--version` is the full report a bug report needs. Give both
