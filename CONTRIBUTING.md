@@ -227,7 +227,7 @@ in **two** synchronized places:
 tag into the section for the version being released, and the release commit
 rewrites that section into readable notes. Never regenerate the whole file —
 `git-cliff -o CHANGELOG.md` replaces every earlier hand-written section with its
-terse skeleton (the 0.1.1 section is written by hand). Install locally:
+terse skeleton (the sections already in the file are hand-written prose). Install locally:
 
 ```bash
 # Pick your preferred method:
@@ -271,7 +271,18 @@ git branch -d release/0.2.0
 
 # 6. Publish
 git push origin main develop --tags
+
+# 7. Point the docs at the release you just shipped
+#    README badges + sample output, api/openapi.yaml info.version and examples,
+#    CONTRIBUTING.md examples — anything still naming the previous version.
 ```
+
+> **Step 7 is part of the release, not cleanup.** Version strings scattered through
+> the docs are the one thing `scripts/gate.sh` cannot check, and they go stale
+> silently: `v0.1.2` shipped with a `version-0.1.0` README badge, a `0.1.0`
+> `info.version` in `api/openapi.yaml` and sample output from `v0.1.2-rc.1`.
+> Prefer placeholders (`<previous>`) over version literals in instructions that
+> outlive a single release.
 
 > **Why merge `main`, not the release branch?** `v0.2.0` is tagged on the merge
 > commit that step 4 creates on `main`. Back-merging only `release/0.2.0` into
@@ -304,11 +315,11 @@ never from `project(... VERSION ...)`.
 
 Rules for candidates:
 
-- **Tag on `main`, on the release-merge commit** — the same place as `v0.1.0` and
-  `v0.1.1`, which are annotated tags on `chore(release): merge release/* into
-  main`. Never tag the release-branch tip: the tag must stay reachable from
-  `develop` afterwards, and `main` is the branch every published artifact passes
-  through.
+- **Tag on `main`, on the release-merge commit** — every published tag so far
+  (`v0.1.0`, `v0.1.1`, `v0.1.2`) is an annotated tag on
+  `chore(release): merge release/* into main`. Never tag the release-branch tip:
+  the tag must stay reachable from `develop` afterwards, and `main` is the branch
+  every published artifact passes through.
 - **Published tags are immutable.** Once an `-rc.N` is pushed, do not retag, move
   or delete it: the `.deb`, its CHANGELOG section and every installed
   `/etc/version` file reference it. Fix the defect on the same `release/*` branch
@@ -345,8 +356,8 @@ systemctl status rtos-manager
 curl -s localhost:8080/api/v1/version     # default config, port 8080
 
 # Roll back to the shipped release (no package repo: point at the .deb you kept;
-# the candidate sorts above 0.1.1, hence --allow-downgrades).
-sudo apt install --allow-downgrades ./rtos-manager-0.1.1-x86_64.deb
+# the candidate sorts above <previous>, hence --allow-downgrades).
+sudo apt install --allow-downgrades ./rtos-manager-<previous>-x86_64.deb
 
 # Carry the tag into develop (step 5) and publish (step 6).
 git checkout develop && git merge --no-ff main
@@ -398,6 +409,14 @@ git tag -a v0.2.1 -m "Hotfix 0.2.1"
 git checkout develop && git merge --no-ff hotfix/0.2.1-fix-port-bind
 git push origin main develop --tags
 ```
+
+That is the *emergency* shape: `main` moves first because installed systems are
+already broken. When a fix batch does not have to be in an operator's hands
+today — documentation, metadata, a defect found while preparing the next
+release — cut the `hotfix/*` branch from `main` all the same, but send it to
+`develop` through a pull request and let the next `release/*` carry it to `main`.
+Nothing is tagged twice, `main` still only advances through a release merge, and
+the batch is reviewed like any other change.
 
 ---
 
