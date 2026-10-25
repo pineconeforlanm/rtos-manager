@@ -29,22 +29,38 @@ set(_RTOS_CLIFF_CONFIG "${CMAKE_SOURCE_DIR}/cliff.toml")
 set(_RTOS_CHANGELOG    "${CMAKE_SOURCE_DIR}/CHANGELOG.md")
 
 # --- changelog: regenerate the full file ------------------------------------
+# --offline keeps generation deterministic: the template's `commit.remote.*`
+# references otherwise make git-cliff query the GitHub API for author handles,
+# and a timeout there aborts the run (panic) instead of writing the file. The
+# changelog is built from local history only, so no metadata is needed.
+#
+# DESTRUCTIVE: this rewrites CHANGELOG.md from scratch, so the curated sections
+# of the releases already published are replaced by their terse skeletons. Use
+# it only to bootstrap a new file or to recover a lost one — a normal release
+# adds one section (changelog-unreleased, then paste).
 add_custom_target(changelog
   COMMAND "${GIT_CLIFF_EXECUTABLE}"
     --config "${_RTOS_CLIFF_CONFIG}"
+    --offline
     --output "${_RTOS_CHANGELOG}"
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-  COMMENT "Generating CHANGELOG.md via git-cliff"
+  COMMENT "Regenerating CHANGELOG.md via git-cliff (destructive)"
   VERBATIM
 )
 
-# --- changelog-unreleased: preview what the next section will look like ------
+# --- changelog-unreleased: the section for the version being prepared --------
+# CHANGELOG.md is curated prose: the release commit takes this generated section,
+# enriches it from the commit bodies and pastes it below the header. Only the
+# new section is emitted (`--strip header`), because a full regeneration would
+# replace every earlier hand-written section with its terse skeleton.
 add_custom_target(changelog-unreleased
   COMMAND "${GIT_CLIFF_EXECUTABLE}"
     --config "${_RTOS_CLIFF_CONFIG}"
+    --offline
     --unreleased
+    --strip header
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-  COMMENT "Previewing unreleased changes (git-cliff)"
+  COMMENT "Previewing the next CHANGELOG section (git-cliff)"
   VERBATIM
 )
 
