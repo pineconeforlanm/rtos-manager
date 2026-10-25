@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# =============================================================================
+#  .githooks/pre-commit — run the commit gate before the commit is created.
+#
+#  Installed by scripts/install-hooks.sh; the work itself lives in scripts/gate.sh
+#  so the exact same steps run by hand:
+#
+#    scripts/gate.sh
+#
+#  What the gate does:
+#    1. format   the whole tree is reformatted (staged files are re-staged)
+#    2. release  `cmake --workflow release` = configure + build + tests + DEB
+#    3. coverage `cmake --workflow full`    = coverage build + tests + gcovr
+#                report, then line coverage must be >= 90%
+#    4. tidy     opt-in, off by default
+#
+#  Knobs (export before committing):
+#    RTOS_GATE_COVERAGE=0     skip the coverage workflow + threshold
+#    RTOS_GATE_RELEASE=0      skip the Release workflow
+#    RTOS_GATE_FORMAT=0       skip formatting
+#    RTOS_GATE_MIN_COVERAGE   override the 90% threshold
+#    RTOS_PRECOMMIT_LINT=1    also run clang-tidy on the staged units
+# =============================================================================
+set -euo pipefail
+
+# git invokes this through .git/hooks/<name>, a symlink into .githooks/, so the
+# path has to be resolved before its parent's parent can be treated as the root.
+readonly HOOK_PATH="$(realpath -- "${BASH_SOURCE[0]}")"
+readonly ROOT="$(dirname -- "$(dirname -- "$HOOK_PATH")")"
+
+exec bash "$ROOT/scripts/gate.sh" "$@"
