@@ -5,6 +5,46 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3-rc.1] - 2026-10-25
+
+No behaviour changes: this batch is documentation, API-contract metadata and the
+release procedure itself. It ships as a candidate because the version surfaces are
+exactly what moved — `api/openapi.yaml` `info.version`, the README samples and the
+`CONTRIBUTING.md` release steps — and those are the strings a release has to get
+right before it is called final.
+
+### Added
+- **Step 7 in the release procedure**: after the tag is pushed, point the
+  documentation at the release that just shipped. Version literals in prose are
+  the one thing `scripts/gate.sh` cannot check, so they go stale silently: `0.1.2`
+  shipped with a `version-0.1.0` README badge, a `0.1.0` `info.version` in
+  `api/openapi.yaml` and `-v` / `--version` samples taken from `0.1.2-rc.1`.
+  Instructions that outlive a single release now use placeholders (`<previous>`)
+  instead of literals.
+- **The non-emergency hotfix route** in `CONTRIBUTING.md`: a fix batch that does
+  not have to reach operators today still branches from `main`, but lands on
+  `develop` through a pull request and rides the next `release/*` back to `main`,
+  so nothing is tagged twice and `main` keeps advancing only through release merges.
+
+### Changed
+- **Every version reference names `0.1.2`**: the README badges, the
+  `-v` / `--version` sample output (real stdout of the `v0.1.2` artifact, including
+  its commit, commit count and build timestamp), and the full
+  `GET /api/v1/version` payload in `README.zh.md`, which also notes that the real
+  response is single-line JSON rather than the indented example.
+- **`api/openapi.yaml`** carries `info.version: 0.1.2` and `version` / `patch` /
+  `tag` / `describe` examples that match a released build.
+- **The branch model documented in `CONTRIBUTING.md`** (`docs/branch-model`): the
+  `<type>/*` naming, "develop only moves through a pull request" and the
+  merge-commit rule were described but not written down.
+
+### Fixed
+- **`BuildInfo::ToString()`'s example** in `version.hpp` used a release literal
+  (`0.1.1 (f683f7b on develop)`) that had been wrong for two releases; it is now a
+  placeholder, so it cannot rot.
+- **The `0.1.2` notes below quote the wrong commit**: `c2a0dff` is the `v0.1.2-rc.1`
+  merge commit, the final release is `66073cb`.
+
 ## [0.1.2] - 2026-10-25
 
 Everything in `0.1.2-rc.1` (below) ships in this package; this section lists only
@@ -14,7 +54,7 @@ the Debian version of the final release sorts above its candidate.
 ### Added
 - **`-v` and `--version` are two flags again** (`cli.hpp`, `cli.cc`). They used to
   be one flag with two names, so the short form was unreachable. `-v` now prints a
-  single line — `rtos_manager 0.1.2 (c2a0dff on main)` — which is what a
+  single line — `rtos_manager 0.1.2 (66073cb on main)` — which is what a
   post-install check or a log line wants; `--version` keeps the full labelled
   report and wins when both are given.
 - **`BuildInfo::ToReport()`** — the multi-line report as a string, next to
@@ -171,6 +211,7 @@ normal upgrade, not a downgrade.
   the OpenAPI contract at `api/openapi.yaml` is now the live source for the
   HTTP surface.
 
+[0.1.3-rc.1]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.3-rc.1
 [0.1.2]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.2
 [0.1.2-rc.1]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.2-rc.1
 [0.1.1]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.1
