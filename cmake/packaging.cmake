@@ -37,7 +37,12 @@ set(_pkg_version_in  "${CMAKE_CURRENT_LIST_DIR}/templates/rtos-manager.version.i
 set(_pkg_version_out "${CMAKE_CURRENT_BINARY_DIR}/rtos-manager.version")
 configure_file("${_pkg_version_in}" "${_pkg_version_out}" @ONLY)
 install(FILES "${_pkg_version_out}"
-        DESTINATION "etc/version"
+        # Absolute on purpose: a relative destination would be resolved under
+        # CPACK_PACKAGING_INSTALL_PREFIX (/usr) and the file would ship as
+        # /usr/etc/version/rtos-manager.version, while README documents
+        # /etc/version/rtos-manager.version for ops. DEB packaging stages
+        # through DESTDIR, so an absolute path lands at ./etc/version.
+        DESTINATION "/etc/version"
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
 
 # --- DEB maintainer scripts (preinst / postinst / prerm / postrm) -----------
@@ -71,10 +76,22 @@ set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
-if(DEFINED RTOS_VERSION_PRE_RELEASE AND NOT RTOS_VERSION_PRE_RELEASE STREQUAL "")
-  # CPack 仅接受 M.N.P 三段，semver 预发布标识落到 package 文件名里。
-  set(CPACK_PACKAGE_VERSION_TWEAK "${RTOS_VERSION_PRE_NUM}")
+
+# --- control Version: (≠ artifact file name, see below) ---------------------
+# Derived from the tag-based semver — the same string the binary reports — and
+# NOT from project(... VERSION ...), which only tracks the default branch:
+#     tag v0.1.2       -> Version: 0.1.2
+#     tag v0.1.2-rc.1  -> Version: 0.1.2~rc.1
+# The '~' is load-bearing, not cosmetic: dpkg reads the LAST '-' as the start of
+# the Debian revision, so a literal "0.1.2-rc.1" means upstream "0.1.2-rc" with
+# revision 1, which sorts *after* 0.1.2 — the final release would never upgrade
+# over its own release candidate. '~' sorts before every other character, which
+# is exactly the semver ordering (pre-release < release).
+set(RTOS_DEB_VERSION "${RTOS_VERSION_SEMVER}")
+if(RTOS_VERSION_IS_PRERELEASE)
+  string(REPLACE "-" "~" RTOS_DEB_VERSION "${RTOS_DEB_VERSION}")
 endif()
+set(CPACK_DEBIAN_PACKAGE_VERSION "${RTOS_DEB_VERSION}")
 
 # 包内文件 FHS 根（注意是 PACKAGING 不是 PACKING，旧名拼错会让 deb 内路径回退到 /usr/local）。
 set(CPACK_PACKAGING_INSTALL_PREFIX "${RTOS_PACKAGE_PREFIX}")
