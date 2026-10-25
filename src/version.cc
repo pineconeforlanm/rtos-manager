@@ -3,8 +3,8 @@
 //
 //  The accessors are inline constexpr forwards declared in version.hpp, so only
 //  what cannot live in a header is left here: the single instance, the JSON wire
-//  shape and the two renderings. No logging happens here — callers own the
-//  output stream.
+//  shape and the renderings. No logging happens here — callers own the output
+//  stream.
 // ============================================================================
 #include "rtos_manager/version.hpp"
 
@@ -56,6 +56,23 @@ auto BuildInfo::Get() noexcept -> const BuildInfo& {
 // --- Rendering --------------------------------------------------------------
 auto BuildInfo::ToString() const -> std::string {
   return std::format("{} ({} on {}{})", Semver(), GitHashShort(), GitBranch(), IsDirty() ? ", dirty" : "");
+}
+
+auto BuildInfo::ToReport() const -> std::string {
+  // One field per line, label-aligned, so a pasted report reads as a table and
+  // a diff between two builds points at the field that moved. The trailing
+  // newline makes the string print-ready as a whole.
+  return std::format(
+      "{} {}\n"
+      "  description : {}\n"
+      "  homepage    : {}\n"
+      "  git         : {} [hash={} branch={} tag={} commits={} dirty={} date={}]\n"
+      "  build       : type={} time={} UTC\n"
+      "  system      : {} {} ({})\n"
+      "  compiler    : {} {} (C++{})\n",
+      ProjectName(), Semver(), ProjectDescription(), ProjectHomepage(), GitDescribe(), GitHash(), GitBranch(), GitTag(),
+      CommitCount(), IsDirty(), CommitDate(), BuildType(), BuildTimestamp(), SystemName(), SystemVersion(), Processor(),
+      CompilerId(), CompilerVersion(), CxxStandard());
 }
 
 auto BuildInfo::ToJson() const -> std::string {

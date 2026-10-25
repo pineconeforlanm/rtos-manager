@@ -4,6 +4,7 @@
 #include "rtos_manager/application.hpp"
 
 #include <exception>
+#include <print>
 #include <utility>
 #include <ylt/easylog.hpp>
 
@@ -18,14 +19,15 @@ Application::Application(CommandLine request) noexcept : request_(std::move(requ
 auto Application::Run(int argc, const char* const* argv, const ServerRunner& runner) -> int {
   auto app = Application{CommandLine::Parse(argc, argv)};
 
-  InitProvisionalLogging();
-
   // Stage 1: a request that needs no configuration short-circuits before any
-  // file is touched, so `-v` can never fail because of a broken YAML file.
-  if (app.request_.WantsVersion()) {
-    app.ShowVersion();
+  // file is read and before a logger exists, so `-v` can never fail because of
+  // a broken YAML file — nor leave a log file behind.
+  if (const auto version = app.request_.RequestedVersion(); version != VersionRequest::kNone) {
+    app.ShowVersion(version);
     return 0;
   }
+
+  InitProvisionalLogging();
 
   if (!app.LoadConfiguration()) {
     return 1;
@@ -39,16 +41,16 @@ auto Application::InitProvisionalLogging() -> void {
   InitLogging(provisional);
 }
 
-auto Application::ShowVersion() const -> void {
+auto Application::ShowVersion(const VersionRequest request) const -> void {
+  // Straight to stdout, not through easylog: these flags answer a question and
+  // exit, and `[timestamp] INFO [pid] [file:line]` in front of every field made
+  // the output awkward to grep and impossible to diff between two builds.
   const auto& info = BuildInfo::Get();
-  ELOGFMT(INFO, "{} {}", info.ProjectName(), info.Semver());
-  ELOGFMT(INFO, "  description : {}", info.ProjectDescription());
-  ELOGFMT(INFO, "  homepage    : {}", info.ProjectHomepage());
-  ELOGFMT(INFO, "  git         : {} [hash={} branch={} tag={} commits={} dirty={} date={}]", info.GitDescribe(),
-          info.GitHash(), info.GitBranch(), info.GitTag(), info.CommitCount(), info.IsDirty(), info.CommitDate());
-  ELOGFMT(INFO, "  build       : type={} time={} UTC", info.BuildType(), info.BuildTimestamp());
-  ELOGFMT(INFO, "  system      : {} {} ({})", info.SystemName(), info.SystemVersion(), info.Processor());
-  ELOGFMT(INFO, "  compiler    : {} {} (C++{})", info.CompilerId(), info.CompilerVersion(), info.CxxStandard());
+  if (request == VersionRequest::kFull) {
+    std::print("{}", info.ToReport());
+    return;
+  }
+  std::print("{} {}\n", info.ProjectName(), info.ToString());
 }
 
 auto Application::LoadConfiguration() -> bool {

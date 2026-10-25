@@ -7,9 +7,10 @@
 //    CommandLine         argument parsing   (cli.hpp)
 //    AppConfig           YAML settings      (config.hpp)
 //    RunHttpServer       HTTP service       (http_server.hpp)
-//  Supported flags: -h/--help, -v/--version, -c/--config <file>. Every runtime
-//  knob (listen host/port, threads, logging) lives in the YAML file — there are
-//  no per-option CLI overrides by design.
+//  Supported flags: -h/--help, -v (one version line), --version (full build
+//  report), -c/--config <file>. Every runtime knob (listen host/port, threads,
+//  logging) lives in the YAML file — there are no per-option CLI overrides by
+//  design.
 // ============================================================================
 #include <cstdlib>
 #include <exception>

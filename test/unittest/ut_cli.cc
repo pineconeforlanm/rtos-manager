@@ -18,6 +18,7 @@
 namespace {
 
 using rtos_manager::CommandLine;
+using rtos_manager::VersionRequest;
 
 /// Parse the given arguments behind a synthetic argv[0] ("rtos-manager").
 auto Parse(std::initializer_list<std::string_view> args) -> CommandLine {
@@ -39,13 +40,22 @@ auto Parse(std::initializer_list<std::string_view> args) -> CommandLine {
 TEST(CommandLineTest, DefaultsToNoRequest) {
   const auto cmd = Parse({});
   EXPECT_FALSE(cmd.HasConfig());
-  EXPECT_FALSE(cmd.WantsVersion());
+  EXPECT_EQ(cmd.RequestedVersion(), VersionRequest::kNone);
   EXPECT_TRUE(cmd.ConfigPath().empty());
 }
 
-TEST(CommandLineTest, VersionFlagIsDetected) {
-  EXPECT_TRUE(Parse({"-v"}).WantsVersion());
-  EXPECT_TRUE(Parse({"--version"}).WantsVersion());
+TEST(CommandLineTest, ShortFlagAsksForTheBriefReport) {
+  EXPECT_EQ(Parse({"-v"}).RequestedVersion(), VersionRequest::kBrief);
+}
+
+TEST(CommandLineTest, LongFlagAsksForTheFullReport) {
+  EXPECT_EQ(Parse({"--version"}).RequestedVersion(), VersionRequest::kFull);
+}
+
+// Both flags at once is not an error: the full report contains the brief one.
+TEST(CommandLineTest, FullReportWinsOverTheBriefOne) {
+  EXPECT_EQ(Parse({"-v", "--version"}).RequestedVersion(), VersionRequest::kFull);
+  EXPECT_EQ(Parse({"--version", "-v"}).RequestedVersion(), VersionRequest::kFull);
 }
 
 TEST(CommandLineTest, VersionFlagDoesNotImplyConfig) {
@@ -61,7 +71,7 @@ TEST(CommandLineTest, ConfigPathIsCaptured) {
   const auto cmd = Parse({"-c", RTOS_TEST_CONFIG_FILE});
   EXPECT_TRUE(cmd.HasConfig());
   EXPECT_EQ(cmd.ConfigPath(), RTOS_TEST_CONFIG_FILE);
-  EXPECT_FALSE(cmd.WantsVersion());
+  EXPECT_EQ(cmd.RequestedVersion(), VersionRequest::kNone);
 }
 
 TEST(CommandLineTest, LongConfigFlagMatchesShortOne) {

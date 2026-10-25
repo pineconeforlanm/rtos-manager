@@ -124,15 +124,15 @@ main()
 | Lifecycle | `rtos_manager::Application` | `application.hpp` | Stage order, exit status, config lifetime |
 | Argument parsing | `rtos_manager::CommandLine` | `cli.hpp` | argv → request data; CLI11 stays private to `cli.cc` |
 | Configuration | `rtos_manager::AppConfig` | `config.hpp` | YAML → settings, defaults for missing keys |
-| Build metadata | `rtos_manager::BuildInfo` | `version.hpp` | Read-only accessors + `ToString()` / `ToJson()` |
+| Build metadata | `rtos_manager::BuildInfo` | `version.hpp` | Read-only accessors + `ToString()` / `ToReport()` / `ToJson()` |
 | HTTP surface | `RunHttpServer()` | `http_server.hpp` | coro_http server, `GET /api/v1/version` |
 
 Two rules keep the layering honest:
 
 * **No upward calls.** `CommandLine` never opens files, `BuildInfo` never logs,
-  `Application` never formats metadata — the layer that owns the concern (config,
-  output, lifecycle) does the work. `--version` therefore prints from
-  `Application::ShowVersion()`, not from a method on the data class.
+  `Application` never invents metadata — the layer that owns the concern (config,
+  output, lifecycle) does the work. `-v`/`--version` therefore print from
+  `Application::ShowVersion()`, using the strings `BuildInfo` renders.
 * **Data over procedures.** Every stage hands back a value (a `CommandLine`, an
   exit status) instead of mutating globals, so each one can be tested on its own
   — see `test/unittest/ut_cli.cc`.
@@ -176,13 +176,14 @@ cmake --preset release
 cmake --build --preset release
 ctest  --preset release
 ./build/release/bin/rtos-manager -h               # usage
-./build/release/bin/rtos-manager -v               # build metadata (via logging)
+./build/release/bin/rtos-manager -v               # one version line
+./build/release/bin/rtos-manager --version        # full build report
 ./build/release/bin/rtos-manager -c config/rtos_manager.yaml   # run HTTP daemon
 ```
 
-> The CLI accepts exactly three flags: `-h` (help), `-v` (version) and `-c`
-> (config path). Everything else — listen host/port, IO threads, logging — is
-> configured through the YAML file.
+> The CLI accepts four flags: `-h` (help), `-v` (version line), `--version`
+> (full report) and `-c` (config path). Everything else — listen host/port, IO
+> threads, logging — is configured through the YAML file.
 
 #### One-click lifecycle with `cmake --workflow`
 
@@ -433,25 +434,32 @@ architecture, compiler id/version, C++ standard) and generates
 `build/generated/rtos_manager/version_info.hpp`.
 
 These values are compiled into the binary and surfaced through
-`rtos_manager::BuildInfo` (`ToString()` for one-line banners, `ToJson()` for the
-HTTP response). `--version` prints them through the easylog logging framework —
-one log line per section, so each carries the `[timestamp] LEVEL [pid]
-[file:line]` prefix:
+`rtos_manager::BuildInfo` (`ToString()` for the one-line banner, `ToReport()`
+for the full report, `ToJson()` for the HTTP response). Two flags expose them,
+and both write plain text to **stdout** — no log prefix, no log file — so the
+output stays greppable and diffable between builds:
 
 ```bash
+$ rtos-manager -v
+rtos_manager 0.1.2-rc.1 (c2a0dff on main)
+
 $ rtos-manager --version
-2026-10-11 09:30:00.123456 INFO [12345] [application.cc:44] rtos_manager 0.1.0
-2026-10-11 09:30:00.123456 INFO [12345] [application.cc:45]   description : RTOS Manager — an HTTP service for managing RTOS devices
-2026-10-11 09:30:00.123456 INFO [12345] [application.cc:46]   homepage    : https://github.com/pineconeforlanm/rtos-manager
-2026-10-11 09:30:00.123456 INFO [12345] [application.cc:47]   git         : 0.1.0-1-ga1b2c3d [hash=a1b2c3d... branch=develop ... dirty=true ...]
-2026-10-11 09:30:00.123456 INFO [12345] [application.cc:50]   build       : type=Release time=2026-10-11 09:30:00 UTC
-2026-10-11 09:30:00.123456 INFO [12345] [application.cc:52]   system      : Linux 6.x (x86_64)
-2026-10-11 09:30:00.123456 INFO [12345] [application.cc:54]   compiler    : GNU 16.2.0 (C++26)
+rtos_manager 0.1.2-rc.1
+  description : RTOS Manager — an HTTP service for managing RTOS devices
+  homepage    : https://github.com/pineconeforlanm/rtos-manager
+  git         : v0.1.2-rc.1 [hash=c2a0dff… branch=main tag=v0.1.2-rc.1 commits=28 dirty=false date=…]
+  build       : type=Release time=2026-10-25 09:20:28 UTC
+  system      : Linux 6.18.40 (x86_64)
+  compiler    : GNU 16.2.0 (C++26)
 ```
 
-The report lives in `Application::ShowVersion()`: `BuildInfo` exposes values and
-their textual forms but never writes to a logger, so the data class stays usable
-without logging initialised.
+`-v` is the brief form ("which build am I running?", the one a post-install
+script can parse); `--version` is the full report a bug report needs. Give both
+and `--version` wins, since it is a superset.
+
+The printing lives in `Application::ShowVersion()`: `BuildInfo` renders the text
+but never writes to a stream or a logger, so the report also works with logging
+not initialised.
 
 ---
 

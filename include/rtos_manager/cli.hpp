@@ -12,6 +12,18 @@
 
 namespace rtos_manager {
 
+/// Which version report the command line asked for.
+///
+/// The two flags are deliberately distinct rather than one alias of the other:
+/// `-v` answers "which build am I running?" in a single line (scripts, `dpkg`
+/// post-install checks), while `--version` is the full report a bug report
+/// needs. Printing happens in Application; this only records the request.
+enum class VersionRequest {
+  kNone,   ///< No version flag given.
+  kBrief,  ///< `-v`: one line, e.g. "rtos_manager 0.1.2-rc.1 (c2a0dff on main)".
+  kFull,   ///< `--version`: every field of the build metadata, one per line.
+};
+
 /// The request expressed on the command line, as data.
 ///
 /// Result of parsing, not a parser: the CLI11::App lives and dies inside
@@ -34,14 +46,16 @@ class CommandLine {
   [[nodiscard]] auto ConfigPath() const noexcept -> const std::string&;
   /// True when a configuration file was requested.
   [[nodiscard]] auto HasConfig() const noexcept -> bool;
-  /// True when -v/--version was requested.
-  [[nodiscard]] auto WantsVersion() const noexcept -> bool;
+  /// Which version report -v/--version asked for; kNone when neither was given.
+  /// `--version` wins when both flags appear, since it is a superset.
+  [[nodiscard]] auto RequestedVersion() const noexcept -> VersionRequest;
 
  private:
   CommandLine() noexcept = default;
 
   std::string config_path_{};
-  bool wants_version_{false};
+  bool wants_brief_version_{false};
+  bool wants_full_version_{false};
 };
 
 }  // namespace rtos_manager

@@ -117,14 +117,14 @@ main()
 | 生命周期 | `rtos_manager::Application` | `application.hpp` | 阶段顺序、退出码、配置生命周期 |
 | 参数解析 | `rtos_manager::CommandLine` | `cli.hpp` | argv → 请求数据；CLI11 只存在于 `cli.cc` |
 | 配置 | `rtos_manager::AppConfig` | `config.hpp` | YAML → 配置，缺省键回落默认值 |
-| 构建元数据 | `rtos_manager::BuildInfo` | `version.hpp` | 只读访问器 + `ToString()` / `ToJson()` |
+| 构建元数据 | `rtos_manager::BuildInfo` | `version.hpp` | 只读访问器 + `ToString()` / `ToReport()` / `ToJson()` |
 | HTTP 接口 | `RunHttpServer()` | `http_server.hpp` | coro_http 服务、`GET /api/v1/version` |
 
 两条规则保证分层不被破坏：
 
 * **不允许向上调用**：`CommandLine` 不读文件，`BuildInfo` 不打日志，`Application`
-  不拼元信息文案——谁负责这件事（配置、输出、生命周期）就由谁来做。因此 `--version`
-  的输出在 `Application::ShowVersion()` 里，而不是数据类上的某个方法。
+  不臆造元信息——谁负责这件事（配置、输出、生命周期）就由谁来做。因此 `-v`/`--version`
+  的输出在 `Application::ShowVersion()` 里，文本由 `BuildInfo` 渲染。
 * **数据优于过程**：每个阶段都以值的形式返回结果（`CommandLine`、退出码），
   而不是改全局状态，因此每一层都能单独测试——见 `test/unittest/ut_cli.cc`。
 
@@ -161,11 +161,14 @@ cmake --preset release
 cmake --build --preset release
 ctest  --preset release
 ./build/release/bin/rtos-manager -h               # 帮助
-./build/release/bin/rtos-manager -v               # 打印版本/构建元信息
+./build/release/bin/rtos-manager -v               # 一行版本信息
+./build/release/bin/rtos-manager --version        # 完整构建元信息
 ./build/release/bin/rtos-manager -c config/rtos_manager.yaml   # 启动 HTTP 守护进程
 ```
 
-> **CLI 只支持三个参数**：`-h`（帮助）、`-v`（版本）、`-c`（配置文件路径）。
+> **CLI 共四个参数**：`-h`（帮助）、`-v`（一行版本）、`--version`（完整报告）、
+> `-c`（配置文件路径）。两者都用 `std::print` 直接写 stdout，不带日志前缀、不产生日志文件；
+> 同时给出时 `--version` 生效（它是 `-v` 的超集）。
 > 其余所有运行期配置（监听 host/port、IO 线程数、日志）都写在 YAML 配置文件里。
 
 #### 用 `cmake --workflow` 一键跑完整生命周期
@@ -278,6 +281,22 @@ DEB 控制字段 `Version:` 同样取自标签，但预发布标识写作 `~` �
 [CONTRIBUTING.md](CONTRIBUTING.md#release-candidates-rcn)。RC 同样是发布物：标签打在
 `main` 的发布合并提交上，在 `CHANGELOG.md` 里各自成段（`cliff.toml` 有意让
 `vX.Y.Z-rc.N` 命中 `tag_pattern`），且**一旦推送就不再重打/移动/删除**。
+
+两档输出（都直接写 stdout，不带日志前缀）：
+
+```bash
+$ rtos-manager -v          # 一行：装完包先看它
+rtos_manager 0.1.2-rc.1 (c2a0dff on main)
+
+$ rtos-manager --version   # 全量：贴进 issue
+rtos_manager 0.1.2-rc.1
+  description : RTOS Manager — an HTTP service for managing RTOS devices
+  homepage    : https://github.com/pineconeforlanm/rtos-manager
+  git         : v0.1.2-rc.1 [hash=c2a0dff… branch=main tag=v0.1.2-rc.1 commits=28 dirty=false date=…]
+  build       : type=Release time=2026-10-25 09:20:28 UTC
+  system      : Linux 6.18.40 (x86_64)
+  compiler    : GNU 16.2.0 (C++26)
+```
 
 ### OpenAPI 契约
 

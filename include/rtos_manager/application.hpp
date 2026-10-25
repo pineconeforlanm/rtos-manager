@@ -43,11 +43,14 @@ class Application {
   /// Only meaningful with a request in hand, so construction is not public.
   explicit Application(CommandLine request) noexcept;
 
-  /// Stage 0: a console-only logger, so every later stage — including `-v` and
+  /// Stage 1 (`-v` / `--version`): print the requested version report to
+  /// stdout and exit. Not routed through the logger on purpose — the flag is a
+  /// query, so the text must stay free of log prefixes.
+  /// @param request which report to print; kNone never reaches this call.
+  auto ShowVersion(VersionRequest request) const -> void;
+  /// Stage 2: a console-only logger, so the stages below — including
   /// configuration errors — can report through the logging framework.
   static auto InitProvisionalLogging() -> void;
-  /// Stage 2 (`-v/--version`): print the build report.
-  auto ShowVersion() const -> void;
   /// Stage 3: overlay the YAML file onto the built-in defaults.
   /// @return false when a file was given but could not be used.
   [[nodiscard]] auto LoadConfiguration() -> bool;
