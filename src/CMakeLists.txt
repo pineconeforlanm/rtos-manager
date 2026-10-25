@@ -31,6 +31,8 @@ set_source_files_properties(http_server.cc PROPERTIES
 
 add_library(rtos_manager_core STATIC
   version.cc
+  cli.cc
+  application.cc
   config.cc
   logging.cc
   http_server.cc)
@@ -44,21 +46,24 @@ target_include_directories(rtos_manager_core
 
 # rtos::ylt is PUBLIC so the coro_http/easylog include dirs reach the executable
 # and the tests, which also emit logs / register handlers directly.
+# CLI11 stays PRIVATE: it is an implementation detail of cli.cc, invisible to
+# anyone consuming CommandLine (see include/rtos_manager/cli.hpp).
 target_link_libraries(rtos_manager_core
   PUBLIC
     rtos::ylt
     rtos::project_options
   PRIVATE
-    glaze::glaze)
+    glaze::glaze
+    CLI11::CLI11)
 
 rtos_add_default_warnings(rtos_manager_core)
 
 # --- Executable (CLI tool + HTTP service) -----------------------------------
+# main.cc only delegates to Application::Run(), so the executable needs nothing
+# beyond the core library.
 add_executable(rtos_manager main.cc)
 
-target_link_libraries(rtos_manager PRIVATE
-  rtos::core
-  CLI11::CLI11)
+target_link_libraries(rtos_manager PRIVATE rtos::core)
 
 rtos_add_default_warnings(rtos_manager)
 
@@ -74,6 +79,11 @@ install(TARGETS rtos_manager_core
 install(TARGETS rtos_manager RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/rtos_manager
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# version.hpp includes the configure-time generated header, and
+# RTOS_GENERATED_INCLUDE_DIR is a BUILD_INTERFACE-only include dir — without this
+# the installed <rtos_manager/version.hpp> would not compile downstream.
+install(FILES ${RTOS_GENERATED_INCLUDE_DIR}/rtos_manager/version_info.hpp
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rtos_manager)
 # Default configuration file (systemd unit references /usr/share/rtos-manager).
 install(FILES ${PROJECT_SOURCE_DIR}/config/rtos_manager.yaml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/rtos-manager)
