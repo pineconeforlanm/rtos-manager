@@ -8,6 +8,7 @@
 // ============================================================================
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
@@ -21,10 +22,12 @@
 
 #include "rtos_manager/application.hpp"
 #include "rtos_manager/config.hpp"
+#include "rtos_manager/version.hpp"
 
 namespace {
 
 using rtos_manager::Application;
+using rtos_manager::BuildInfo;
 using rtos_manager::ServerConfig;
 
 /// Unique temporary path; `suffix` keeps .yaml files recognisable.
@@ -64,6 +67,32 @@ struct RecordingBackend {
   bool called{false};
   std::optional<ServerConfig> seen{};
 };
+
+/// Run the pipeline and return what it wrote to stdout.
+/// The version flags print through std::print, i.e. to fd 1, which is exactly
+/// what GoogleTest's capture redirects — so the assertions see the real bytes a
+/// shell would.
+auto RunCapturingStdout(std::initializer_list<std::string_view> args) -> std::string {
+  ::testing::internal::CaptureStdout();
+  const auto status = RunApp(args, [](const ServerConfig&) {});
+  const auto output = ::testing::internal::GetCapturedStdout();
+  EXPECT_EQ(status, 0) << "version flags must always exit successfully";
+  return output;
+}
+
+TEST(ApplicationTest, BriefVersionIsOneLineWithoutLogPrefixes) {
+  const auto out = RunCapturingStdout({"-v"});
+  EXPECT_EQ(std::count(out.begin(), out.end(), '\n'), 1) << "expected exactly one line, got:\n" << out;
+  EXPECT_NE(out.find(BuildInfo::Get().Semver()), std::string::npos) << out;
+  EXPECT_EQ(out.find("INFO"), std::string::npos) << "the version output must not carry log prefixes:\n" << out;
+}
+
+TEST(ApplicationTest, FullVersionPrintsTheWholeReport) {
+  const auto out = RunCapturingStdout({"--version"});
+  EXPECT_GT(std::count(out.begin(), out.end(), '\n'), 1) << "expected a multi-line report, got:\n" << out;
+  EXPECT_NE(out.find(BuildInfo::Get().GitHash()), std::string::npos) << out;
+  EXPECT_EQ(out.find("INFO"), std::string::npos) << "the version output must not carry log prefixes:\n" << out;
+}
 
 TEST(ApplicationTest, VersionFlagNeverTouchesTheConfiguration) {
   // The YAML file is deliberately unparsable: -v must short-circuit before

@@ -33,6 +33,14 @@ install(FILES "${_service_out}"
         DESTINATION "lib/systemd/system")
 
 # --- /etc/version/<pkg>.version (运维查看包内版本，与二进制 --version 一致) ----
+# The ".N" suffix is only appended when the tag really carries a pre-release:
+# for a final release PRE_RELEASE is empty, so appending unconditionally renders
+# a meaningless "Pre-release : .0" — which is what 0.1.2 shipped before this fix.
+if(RTOS_VERSION_IS_PRERELEASE)
+  set(RTOS_VERSION_PRE_RELEASE_LABEL "${RTOS_VERSION_PRE_RELEASE}.${RTOS_VERSION_PRE_NUM}")
+else()
+  set(RTOS_VERSION_PRE_RELEASE_LABEL "none")
+endif()
 set(_pkg_version_in  "${CMAKE_CURRENT_LIST_DIR}/templates/rtos-manager.version.in")
 set(_pkg_version_out "${CMAKE_CURRENT_BINARY_DIR}/rtos-manager.version")
 configure_file("${_pkg_version_in}" "${_pkg_version_out}" @ONLY)

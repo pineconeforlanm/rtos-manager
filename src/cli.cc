@@ -16,7 +16,11 @@ auto CommandLine::Parse(int argc, const char* const* argv) -> CommandLine {
   // hand back, so there is no intermediate state to keep in sync.
   auto options = CommandLine{};
   app.add_option("-c,--config", options.config_path_, "Path to YAML configuration file")->check(CLI::ExistingFile);
-  app.add_flag("-v,--version", options.wants_version_, "Print build & version information and exit");
+  // Two flags, not one with two names: -v and --version answer different
+  // questions (see VersionRequest). Binding them separately is what makes the
+  // distinction visible here instead of being guessed from the matched name.
+  app.add_flag("-v", options.wants_brief_version_, "Print the version line and exit");
+  app.add_flag("--version", options.wants_full_version_, "Print the full build information and exit");
 
   try {
     app.parse(argc, argv);
@@ -33,6 +37,12 @@ auto CommandLine::ConfigPath() const noexcept -> const std::string& { return con
 
 auto CommandLine::HasConfig() const noexcept -> bool { return !config_path_.empty(); }
 
-auto CommandLine::WantsVersion() const noexcept -> bool { return wants_version_; }
+auto CommandLine::RequestedVersion() const noexcept -> VersionRequest {
+  // --version is the superset, so it wins if both flags were given.
+  if (wants_full_version_) {
+    return VersionRequest::kFull;
+  }
+  return wants_brief_version_ ? VersionRequest::kBrief : VersionRequest::kNone;
+}
 
 }  // namespace rtos_manager
