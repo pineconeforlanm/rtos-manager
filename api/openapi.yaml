@@ -10,7 +10,7 @@
 openapi: 3.1.0
 info:
   title: rtos-manager HTTP API
-  version: 0.1.0
+  version: 0.1.2
   summary: Minimal control plane for managing RTOS devices over HTTP.
   description: |
     Endpoints exposed by `rtos-manager` (coro_http backend).
@@ -68,17 +68,17 @@ components:
         project:      { type: string,  example: rtos_manager }
         description:  { type: string,  example: 'An HTTP service for managing RTOS devices.' }
         homepage:     { type: string,  format: uri, example: 'https://github.com/pineconeforlanm/rtos-manager' }
-        version:      { type: string,  example: '0.1.0', description: 'Semver from git tag (or project VERSION fallback).' }
+        version:      { type: string,  example: '0.1.2', description: 'Semver from git tag (or project VERSION fallback).' }
         major:        { type: integer, example: 0 }
         minor:        { type: integer, example: 1 }
-        patch:        { type: integer, example: 0 }
+        patch:        { type: integer, example: 2 }
         preRelease:   { type: string,  example: '', description: 'alpha|beta|rc, or empty for a stable release.' }
         prerelease:   { type: boolean, example: false }
         gitHash:      { type: string,  example: 'a1b2c3d4e5f6...' }
         gitShortHash: { type: string,  example: a1b2c3d }
         branch:       { type: string,  example: develop }
-        tag:          { type: string,  example: v0.1.0 }
-        describe:     { type: string,  example: v0.1.0-3-gabcdef }
+        tag:          { type: string,  example: v0.1.2 }
+        describe:     { type: string,  example: v0.1.2-3-gabcdef }
         commitCount:  { type: integer, example: 42 }
         commitDate:   { type: string,  format: date-time, example: '2026-10-17T13:16:47+08:00' }
         dirty:        { type: boolean, example: false }

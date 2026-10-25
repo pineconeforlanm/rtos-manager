@@ -31,7 +31,7 @@ from conan.tools.cmake import CMakeToolchain, CMakeConfigDeps, CMake, cmake_layo
 
 class RtosManagerConan(ConanFile):
     name = "rtos_manager"
-    version = "0.1.2"
+    version = "0.1.3"
     description = "RTOS Manager — an HTTP service for managing RTOS devices"
     license = "Apache-2.0"
     url = "https://github.com/pineconeforlanm/rtos-manager"
