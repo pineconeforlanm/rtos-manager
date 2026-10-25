@@ -48,24 +48,37 @@ model, and hooks for testing, coverage, documentation and API contracts.
 
 ```
 rtos-manager/
-├── CMakeLists.txt          # top-level project & options
+├── CMakeLists.txt          # project metadata + build graph only (no policy/tooling)
 ├── CMakePresets.json       # configure/build/test/package/workflow presets (Conan-aware)
 ├── conanfile.py            # Conan 2 dependency manifest (Boost/hical/CLI11/glaze/spdlog/gtest/benchmark)
 ├── cmake/                  # reusable CMake modules
+│   ├── project_setup.cmake     # single entry point for all configure-time setup
+│   ├── project_finalize.cmake  # post-target hook: packaging (CPack) + summary
+│   ├── build_options.cmake     # RTOS_ENABLE_* switches + default build type
 │   ├── compiler_options.cmake  # C++26 standard, reflection, warnings, optimization
+│   ├── dependencies.cmake      # Conan packages + vendored yalantinglibs (rtos::ylt)
 │   ├── version_info.cmake      # Git + semver + system/build metadata -> version_info.hpp
+│   ├── compile_commands.cmake  # compile_commands.json + source-root symlink for clangd
 │   ├── coverage.cmake          # gcov/gcovr instrumentation + `coverage` target
 │   ├── doxygen.cmake           # `docs` target helper
 │   ├── openapi.cmake           # `openapi` target (npx @redocly/cli lint + build-docs)
-│   ├── format.cmake            # `format` / `format-check` / `tidy` clang-* conveniences
+│   ├── changelog.cmake         # `changelog` target (git-cliff)
 │   ├── packaging.cmake         # systemd unit + CPack DEB + maintainer scripts + version file
+│   ├── summary.cmake           # configure summary (rtos_print_build_summary)
 │   └── templates/
 │       ├── version_info.hpp.in
 │       ├── rtos-manager.service.in      # systemd unit template
 │       ├── rtos-manager.version.in      # /etc/version/<pkg>.version metadata file
 │       └── maint/                       # DEB pre/postinst/prerm/postrm templates
-├── include/rtos_manager/   # public headers (version/config/logging/http_server)
-├── src/                    # core library + executable (CLI tool + HTTP daemon)
+├── include/rtos_manager/   # public headers (application/cli/version/config/logging/http_server)
+├── src/                    # core library + executable
+│   ├── main.cc                 # process entry: Application::Run(argc, argv)
+│   ├── application.cc          # startup pipeline (request -> config -> serving)
+│   ├── cli.cc                  # CLI11-backed CommandLine::Parse
+│   ├── version.cc              # BuildInfo: JSON + compact-line rendering
+│   ├── config.cc               # YAML -> AppConfig (glaze reflection)
+│   ├── logging.cc              # easylog bootstrap
+│   └── http_server.cc          # coro_http server + GET /api/v1/version
 ├── test/unittest/          # unit tests (ut_*.cc, GoogleTest + CTest)
 ├── example/                # runnable examples, one folder each (RTOS_ENABLE_EXAMPLES=ON)
 │   └── api_client/
@@ -73,6 +86,15 @@ rtos-manager/
 ├── bench/                  # Google Benchmark (bm_*.cc, RTOS_ENABLE_BENCH)
 ├── docs/                   # Doxygen config + vendored doxygen-awesome theme
 │   └── doxygen-awesome/    # theme CSS (MIT, committed for offline builds)
+├── scripts/                # developer tooling — deliberately outside CMake
+│   ├── gate.sh                 # the commit gate: format + release + coverage ≥ 90%
+│   ├── format.sh               # clang-format driver (whole repo / --check / --staged)
+│   ├── build.sh                # Release build alone (-Werror + LTO + tests)
+│   ├── lint.sh                 # clang-tidy driver over compile_commands.json
+│   ├── commit-msg-check.sh     # Conventional Commits gate
+│   └── install-hooks.sh        # symlinks .githooks/* into .git/hooks
+├── .githooks/              # versioned git hooks (pre-commit, commit-msg)
+├── .gitmessage             # commit message template (git config commit.template)
 ├── api/
 │   ├── openapi.yaml                    # OpenAPI 3.1 contract (single source of truth for the REST surface)
 │   └── rtos-manager.hoppscotch.json       # Hoppscotch import for the version endpoint
@@ -80,6 +102,40 @@ rtos-manager/
 └── thirdparty/             # vendored deps: yalantinglibs (coro_http + easylog)
     └── yalantinglibs/      # git submodule, exposed as header-only rtos::ylt
 ```
+
+---
+
+## Architecture
+
+Startup is a chain of single-responsibility layers; each one knows only the
+layer below it, and `main()` holds none of the logic:
+
+```
+main()
+ └─▶ Application::Run(argc, argv)          lifecycle: which stage, in which order
+      ├─ CommandLine::Parse(argc, argv)    argv  -> request value object
+      ├─ LoadConfig(path) -> AppConfig     YAML  -> settings (defaults for missing keys)
+      └─ RunHttpServer(server_config)      settings -> sockets (blocks)
+```
+
+| Layer | Type | Header | Responsibility |
+|-------|------|--------|----------------|
+| Process entry | `main()` | `src/main.cc` | `return Application::Run(argc, argv);` — nothing else |
+| Lifecycle | `rtos_manager::Application` | `application.hpp` | Stage order, exit status, config lifetime |
+| Argument parsing | `rtos_manager::CommandLine` | `cli.hpp` | argv → request data; CLI11 stays private to `cli.cc` |
+| Configuration | `rtos_manager::AppConfig` | `config.hpp` | YAML → settings, defaults for missing keys |
+| Build metadata | `rtos_manager::BuildInfo` | `version.hpp` | Read-only accessors + `ToString()` / `ToJson()` |
+| HTTP surface | `RunHttpServer()` | `http_server.hpp` | coro_http server, `GET /api/v1/version` |
+
+Two rules keep the layering honest:
+
+* **No upward calls.** `CommandLine` never opens files, `BuildInfo` never logs,
+  `Application` never formats metadata — the layer that owns the concern (config,
+  output, lifecycle) does the work. `--version` therefore prints from
+  `Application::ShowVersion()`, not from a method on the data class.
+* **Data over procedures.** Every stage hands back a value (a `CommandLine`, an
+  exit status) instead of mutating globals, so each one can be tested on its own
+  — see `test/unittest/ut_cli.cc`.
 
 ---
 
@@ -93,8 +149,13 @@ pip install conan
 # gcovr + doxygen (Debian/Ubuntu)
 pip install gcovr
 sudo apt install doxygen ninja-build
-# optional: graphviz (Doxygen diagrams) and dpkg-dev (DEB auto shlib deps)
-sudo apt install graphviz dpkg-dev
+# clang-format for scripts/format.sh + the pre-commit hook
+# (pip --user installs into ~/.local/bin; PEP 668 distros need
+#  --break-system-packages, or use apt install clang-format)
+pip install --user clang-format
+# optional: clang-tidy for scripts/lint.sh, graphviz (Doxygen diagrams),
+# dpkg-dev (DEB auto shlib deps)
+sudo apt install clang-tidy graphviz dpkg-dev
 ```
 
 > `yalantinglibs` (coro_http + easylog) is **not** a Conan package — it is
@@ -138,6 +199,11 @@ the whole chain (configure → build → test → package as appropriate):
 | `docs`       | Doxygen + OpenAPI HTML render                                            |
 | `bench`      | Build Google Benchmark executable                                       |
 | `ci-lint`    | clang-tidy analysis (the `tidy` configure preset sets `CMAKE_CXX_CLANG_TIDY`) |
+
+> Formatting is **not** a CMake target — it lives in [`scripts/format.sh`](scripts/format.sh).
+> The commit gate that composes formatting, the Release workflow and the coverage
+> workflow lives in [`scripts/gate.sh`](scripts/gate.sh) and runs from the
+> pre-commit hook. See [Developer tooling](#developer-tooling).
 
 ```bash
 cmake --workflow dev            # quick local loop
@@ -213,7 +279,7 @@ The package installs:
 | `/usr/share/rtos-manager/rtos_manager.yaml`         | default config                       |
 | `/usr/lib/systemd/system/rtos-manager.service`      | unit file                            |
 | `/etc/version/rtos-manager.version`                 | semver + git + build metadata (text) |
-| `/usr/include/rtos_manager/*`                       | public headers                       |
+| `/usr/include/rtos_manager/*`                       | public headers (incl. the generated `version_info.hpp`) |
 | `/usr/lib/librtos_manager_core.a`                   | static library for embedders         |
 
 ### Semantic versioning
@@ -223,13 +289,21 @@ The version is parsed from the latest annotated Git tag matching
 back to `project(... VERSION 0.1.0)` declared in `CMakeLists.txt`. The
 resolved values are baked into:
 
-- `rtos_manager::build::kVersionSemver` etc. in the generated `version_info.hpp`
-- the DEB file name: `rtos-manager-<semver>-<build>-<arch>-<hash>[-dirty].deb`
+- `rtos_manager::BuildInfo` accessors (`BuildInfo::Get().Semver()` …), populated from the generated `constexpr` aggregate `rtos_manager::build::kMetadata` in `version_info.hpp`
+- the DEB file name: `rtos-manager-<semver>[-Debug-<branch>-<hash>[-dirty]]-<arch>.deb`
+- the DEB control `Version:`, with a pre-release written as `~rc.N` rather than
+  `-rc.N` (`v0.1.2-rc.1` → `0.1.2~rc.1`). This is not cosmetic: dpkg treats
+  everything after the **last** `-` as the Debian revision, so a literal
+  `0.1.2-rc.1` sorts *after* `0.1.2` and the final release could never upgrade
+  over its own candidate.
 - `/etc/version/rtos-manager.version`
 - the HTTP `GET /api/v1/version` JSON response (`prerelease: true|false`)
 
 Tag commits according to Git Flow (see `CONTRIBUTING.md`): `v0.2.0`,
-`v0.2.0-rc.1`, etc.
+`v0.2.0-rc.1`, etc. Release candidates are published artifacts too — each one is
+tagged on `main`, keeps its own `CHANGELOG.md` section, and is never retagged;
+the procedure and the artifact/version mapping are in
+[CONTRIBUTING.md](CONTRIBUTING.md#release-candidates-rcn).
 
 ### OpenAPI contract
 
@@ -256,13 +330,83 @@ same commands run on your machine (and in any future automation):
 | Pipeline     | When to run         | Command                                             |
 |--------------|---------------------|-----------------------------------------------------|
 | `dev`        | every change        | `cmake --workflow dev`                              |
-| `lint`       | before every commit | `cmake --build build/debug --target format-check`   |
+| `hooks`      | once per clone      | `scripts/install-hooks.sh` (gate + message gate)    |
+| `gate`       | before every commit | `scripts/gate.sh` — what the `pre-commit` hook runs |
+| `format`     | inside the gate     | `scripts/format.sh` (whole tree; `--staged`, `--check`) |
+| `release`    | inside the gate     | `cmake --workflow release` (build + tests + `.deb`) |
+| `coverage`   | inside the gate     | `cmake --workflow full` + a ≥ 90% line threshold    |
+| `build`      | ad hoc              | `scripts/build.sh --staged` (Release only, no coverage) |
+| `lint`       | before a PR         | `scripts/lint.sh` (clang-tidy, staged: `--staged`)  |
 | `sanitize`   | before a release    | `cmake --workflow sanitize`                         |
-| `coverage`   | before a release    | `cmake --workflow full` (report under build/coverage/) |
-| `release`    | cutting a version   | `cmake --workflow release` (produces the `.deb`)    |
 
 To add a new pipeline shape, drop a step into `CMakePresets.json`'s
 `workflowPresets` — there is no other tooling to keep in sync.
+
+### Developer tooling
+
+Formatting, linting and commit-message rules live in [`scripts/`](scripts/) and
+[`.githooks/`](.githooks/), **not** in the CMake graph: they are per-developer
+concerns that should not slow down or gate a plain `cmake --build`.
+
+```bash
+scripts/install-hooks.sh              # once per clone: symlink .githooks/* -> .git/hooks
+scripts/install-hooks.sh --with-template   # also set commit.template = .gitmessage
+
+scripts/gate.sh                       # the commit gate: format + release + coverage
+scripts/gate.sh --skip-coverage       # quick loop while iterating
+scripts/gate.sh --min-coverage 95     # stricter bar for one run
+
+scripts/format.sh                     # format every project source in place
+scripts/format.sh --check             # gate: non-zero if anything is unformatted
+scripts/format.sh --staged            # only the staged files (the hook runs both)
+
+scripts/build.sh                      # Release build alone: -Werror + LTO + tests
+scripts/build.sh --test               # ... and run ctest for that preset
+scripts/build.sh --staged             # skip when the staged files cannot affect it
+
+scripts/lint.sh                       # clang-tidy over src/*.cc (needs a build dir)
+scripts/lint.sh --staged --fix        # only what is staged, apply suggested fixes
+
+scripts/commit-msg-check.sh -m "feat(http): add /healthz"   # try a message first
+```
+
+| Hook | What it does | Bypass |
+|------|--------------|--------|
+| `pre-commit` | runs `scripts/gate.sh`: formats the **whole tree** (staged files are re-staged, unstaged ones only rewritten — and it refuses a staged file that also has unstaged hunks), then the Release workflow and the coverage workflow with its 90% threshold | `git commit --no-verify` |
+| `commit-msg` | rejects messages git-cliff cannot classify (bad `type`, no `(scope):`, > 72 chars, trailing period, body glued to the subject) | `git commit --no-verify` |
+
+The gate proves two complete pipelines before the commit exists:
+
+1. **Release** — `cmake --workflow release`: configure, build with
+   warnings-as-errors + LTO (stricter than Debug), run the test suite, and build
+   the `.deb`. A `-Werror` regression, a missing include or a broken preset
+   cannot reach `develop`.
+2. **Coverage** — `cmake --workflow full`: instrumented build, the same tests,
+   the gcovr report, then `gate.sh` reads `coverage.xml` and refuses to commit
+   below **90% line coverage** (it prints the per-file table on failure).
+
+Cost: both stages are `cmake --workflow` calls, so they reconfigure first, and a
+configure rewrites `version_info.hpp` (it embeds the build timestamp) — a dozen
+translation units and the LTO link are redone even when nothing changed. Expect
+roughly a minute per commit once warm; the first run in a fresh clone compiles
+two full builds and takes minutes.
+
+`RTOS_GATE_FORMAT=0`, `RTOS_GATE_RELEASE=0` and `RTOS_GATE_COVERAGE=0` skip a
+stage for one commit, `RTOS_GATE_MIN_COVERAGE=95` raises the bar, and
+`RTOS_PRECOMMIT_LINT=1` adds clang-tidy on the staged translation units. Tidy
+stays off by default: it re-parses every file, so it belongs on a PR — use
+`scripts/lint.sh` or `cmake --workflow ci-lint` for that.
+
+Why no `cpplint`: it encodes the *Google* style (2-space indent, 80 columns,
+`.cc`/`.h` pairing) rather than this project's `.clang-format`, it has no
+awareness of C++26 constructs, and `clang-tidy` already covers its useful checks
+(`google-*`, `readability-*`) on the real AST — so running it would only add
+false positives and a second style source of truth.
+
+`wip:` / `fixup!` / `squash!` / `amend!` messages pass the hook on purpose
+(local work in progress); squash them into Conventional Commits before opening
+the PR, as [CONTRIBUTING.md](CONTRIBUTING.md) asks.
+
 
 ### Sanitizers & static analysis
 
@@ -270,9 +414,13 @@ To add a new pipeline shape, drop a step into `CMakePresets.json`'s
 cmake --workflow sanitize          # ASan + UBSan build & tests
 cmake --preset tsan                # ThreadSanitizer (run ctest manually)
 cmake --workflow ci-lint           # clang-tidy across all TUs (needs clang-tidy on PATH)
-cmake --build build/debug --target format        # rewrite sources per .clang-format
-cmake --build build/debug --target format-check  # pre-commit gate (non-zero on any diff)
+scripts/lint.sh                    # the same checks for src/*.cc, without a full rebuild
 ```
+
+`scripts/format.sh` walks `include/`, `src/`, `test/`, `bench/` and `example/` at
+run time — never `thirdparty/` — so a newly added file needs no re-configure.
+`--check` implements the gate through `clang-format --dry-run --Werror`
+(clang-format ≥ 15); the pre-commit hook runs the `--staged` variant.
 
 ---
 
@@ -284,20 +432,26 @@ At configure time, `cmake/version_info.cmake` collects **Git** information
 architecture, compiler id/version, C++ standard) and generates
 `build/generated/rtos_manager/version_info.hpp`.
 
-These values are compiled into the binary and surfaced via `--version`, which
-emits them through the easylog logging framework (one log line per section, so
-each carries the `[timestamp] LEVEL [pid] [file:line]` prefix):
+These values are compiled into the binary and surfaced through
+`rtos_manager::BuildInfo` (`ToString()` for one-line banners, `ToJson()` for the
+HTTP response). `--version` prints them through the easylog logging framework —
+one log line per section, so each carries the `[timestamp] LEVEL [pid]
+[file:line]` prefix:
 
 ```bash
 $ rtos-manager --version
-2026-10-11 09:30:00.123456 INFO [12345] [version.cc:24] rtos_manager 0.1.0
-2026-10-11 09:30:00.123456 INFO [12345] [version.cc:25]   description : RTOS Manager — an HTTP service for managing RTOS devices
-2026-10-11 09:30:00.123456 INFO [12345] [version.cc:26]   homepage    : https://github.com/pineconeforlanm/rtos-manager
-2026-10-11 09:30:00.123456 INFO [12345] [version.cc:27]   git         : 0.1.0-1-ga1b2c3d [hash=a1b2c3d... branch=develop ... dirty=true ...]
-2026-10-11 09:30:00.123456 INFO [12345] [version.cc:31]   build       : type=Release time=2026-10-11 09:30:00 UTC
-2026-10-11 09:30:00.123456 INFO [12345] [version.cc:33]   system      : Linux 6.x (x86_64)
-2026-10-11 09:30:00.123456 INFO [12345] [version.cc:35]   compiler    : GNU 16.2.0 (C++26)
+2026-10-11 09:30:00.123456 INFO [12345] [application.cc:44] rtos_manager 0.1.0
+2026-10-11 09:30:00.123456 INFO [12345] [application.cc:45]   description : RTOS Manager — an HTTP service for managing RTOS devices
+2026-10-11 09:30:00.123456 INFO [12345] [application.cc:46]   homepage    : https://github.com/pineconeforlanm/rtos-manager
+2026-10-11 09:30:00.123456 INFO [12345] [application.cc:47]   git         : 0.1.0-1-ga1b2c3d [hash=a1b2c3d... branch=develop ... dirty=true ...]
+2026-10-11 09:30:00.123456 INFO [12345] [application.cc:50]   build       : type=Release time=2026-10-11 09:30:00 UTC
+2026-10-11 09:30:00.123456 INFO [12345] [application.cc:52]   system      : Linux 6.x (x86_64)
+2026-10-11 09:30:00.123456 INFO [12345] [application.cc:54]   compiler    : GNU 16.2.0 (C++26)
 ```
+
+The report lives in `Application::ShowVersion()`: `BuildInfo` exposes values and
+their textual forms but never writes to a logger, so the data class stays usable
+without logging initialised.
 
 ---
 
@@ -315,6 +469,20 @@ ctest --preset coverage
 # Produce an HTML + XML coverage report under build/coverage/coverage/
 cmake --build build/coverage --target coverage
 ```
+
+Two seams keep the suite socket-free and sleep-free: `Application::Run()` takes
+the server backend as a parameter (`Application::ServerRunner`, defaulting to the
+real `RunHttpServer`), and the `/api/v1/version` handler is a named function
+(`HandleVersionRequest`) driven with a plain `coro_http_response`. The lifecycle,
+the configuration overlay, the logging levels and the HTTP payload are therefore
+all unit-testable, with no ports, threads or timing.
+
+Coverage is measured over `src/` with **`src/main.cc` excluded**
+(`cmake/coverage.cmake`): `main()` is the process entry point — exercised by
+running the binary, not by unit tests — so counting it would turn the number into
+a statement about argv plumbing. `scripts/gate.sh` refuses to commit below
+**90% line coverage**; the per-file table lives in
+`build/coverage/coverage/coverage.txt`.
 
 ## Benchmarks
 
