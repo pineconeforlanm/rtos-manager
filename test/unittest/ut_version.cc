@@ -1,108 +1,107 @@
 // ============================================================================
-//  ut_version.cc — unit tests for rtos_manager::VersionString()/LogVersion()
+//  ut_version.cc — unit tests for rtos_manager::BuildInfo
 //
-//  Test naming uses CamelCase to follow the GoogleTest convention adopted
-//  here; production code now also uses CamelCase to satisfy
-//  readability-identifier-naming.FunctionCase.
+//  Covers the property accessors, the compact ToString() line and the JSON wire
+//  format served by GET /api/v1/version.
+//  Test names follow the GoogleTest CamelCase convention used across the suite.
 // ============================================================================
 #include <gtest/gtest.h>
 
 #include <cstddef>
-#include <sstream>
+#include <format>
 #include <string>
 #include <string_view>
 
-#include <ylt/easylog.hpp>
-
 #include "rtos_manager/version.hpp"
-#include "rtos_manager/version_info.hpp"  // AUTO-GENERATED (rtos_manager::build::*)
+#include "rtos_manager/version_info.hpp"  // AUTO-GENERATED (rtos_manager::build::kMetadata)
 
 namespace {
 
-TEST(VersionTest, VersionStringContainsVersion) {
-  const std::string s = rtos_manager::VersionString();
-  EXPECT_NE(s.find(rtos_manager::build::kVersionSemver), std::string::npos)
-      << "VersionString() should contain the project version: " << s;
-}
+using rtos_manager::BuildInfo;
 
-TEST(VersionTest, VersionStringMentionsGit) {
-  const std::string s = rtos_manager::VersionString();
-  EXPECT_NE(s.find(" on "), std::string::npos)
-      << "VersionString() should mention the git branch: " << s;
-}
-
-TEST(VersionTest, VersionStringHasNoTrailingNewline) {
-  const std::string s = rtos_manager::VersionString();
-  EXPECT_EQ(s.find('\n'), std::string::npos)
-      << "VersionString() must be a single line";
-}
-
-// Sanity-check the semver string baked in at configure time has the canonical
-// "MAJOR.MINOR.PATCH" shape (with optional "-prerel.N"). This guards against
-// regressions in cmake/version_info.cmake's regex.
-TEST(VersionTest, SemverLooksCanonical) {
-  const std::string_view v = rtos_manager::build::kVersionSemver;
-  ASSERT_FALSE(v.empty());
-  // 1.2.3  or  1.2.3-rc.4  /  -alpha.1  /  -beta.9
-  const auto ok = [](std::string_view s) {
-    auto is_digit = [](char c) { return c >= '0' && c <= '9'; };
-    std::size_t i = 0;
-    auto eat_num = [&]() {
-      std::size_t start = i;
-      while (i < s.size() && is_digit(s[i])) {
-        ++i;
-      }
-      return i > start;
-    };
-    auto expect = [&](char c) {
-      if (i >= s.size() || s[i] != c) {
-        return false;
-      }
+/// MAJOR.MINOR.PATCH[-prerel.N] — mirrors the regex in cmake/version_info.cmake.
+auto IsCanonicalSemver(std::string_view s) -> bool {
+  auto is_digit = [](char c) -> bool { return c >= '0' && c <= '9'; };
+  auto i = std::size_t{0};
+  auto eat_number = [&]() -> bool {
+    const auto start = i;
+    while (i < s.size() && is_digit(s[i])) {
       ++i;
-      return true;
-    };
-    if (!eat_num()) return false;
-    if (!expect('.')) return false;
-    if (!eat_num()) return false;
-    if (!expect('.')) return false;
-    if (!eat_num()) return false;
-    if (i < s.size() && s[i] == '-') {
-      ++i;
-      std::size_t start = i;
-      while (i < s.size() && s[i] != '.') {
-        ++i;
-      }
-      if (i == start) return false;
-      if (!expect('.')) return false;
-      if (!eat_num()) return false;
     }
-    return i == s.size();
+    return i > start;
   };
-  EXPECT_TRUE(ok(v)) << "kVersionSemver is not in MAJOR.MINOR.PATCH[-pre.N] form: " << v;
+  auto expect = [&](char c) -> bool {
+    if (i >= s.size() || s[i] != c) {
+      return false;
+    }
+    ++i;
+    return true;
+  };
+
+  if (!eat_number()) return false;
+  if (!expect('.')) return false;
+  if (!eat_number()) return false;
+  if (!expect('.')) return false;
+  if (!eat_number()) return false;
+  if (i < s.size() && s[i] == '-') {
+    ++i;
+    const auto start = i;
+    while (i < s.size() && s[i] != '.') {
+      ++i;
+    }
+    if (i == start) return false;
+    if (!expect('.')) return false;
+    if (!eat_number()) return false;
+  }
+  return i == s.size();
 }
 
-TEST(VersionTest, LogVersionReportSections) {
-  // Route the process-wide logger to console-off / file-off, and attach an
-  // extra appender that captures each record's message into `os`.
-  std::ostringstream os;
-  easylog::init_log<0>(easylog::Severity::INFO, "", /*async=*/false,
-                       /*enable_console=*/false);
-  easylog::add_appender<0>(
-      [&os](easylog::record_t& rec) { os << rec.get_message() << '\n'; });
+TEST(BuildInfoTest, ToStringContainsSemver) {
+  const auto& info = BuildInfo::Get();
+  const auto text = info.ToString();
+  EXPECT_NE(text.find(info.Semver()), std::string::npos) << "ToString() should contain the project version: " << text;
+}
 
-  rtos_manager::LogVersion();
+TEST(BuildInfoTest, ToStringMentionsGitBranch) {
+  const auto text = BuildInfo::Get().ToString();
+  EXPECT_NE(text.find(" on "), std::string::npos) << "ToString() should mention the git branch: " << text;
+}
 
-  const std::string report = os.str();
-  EXPECT_NE(report.find(rtos_manager::build::kProjectName), std::string::npos);
-  EXPECT_NE(report.find(rtos_manager::build::kProjectDescription), std::string::npos);
-  EXPECT_NE(report.find("homepage"), std::string::npos);
-  EXPECT_NE(report.find("git "), std::string::npos);
-  EXPECT_NE(report.find("build "), std::string::npos);
-  EXPECT_NE(report.find("system "), std::string::npos);
-  EXPECT_NE(report.find("compiler "), std::string::npos);
+TEST(BuildInfoTest, ToStringIsSingleLine) {
+  const auto text = BuildInfo::Get().ToString();
+  EXPECT_EQ(text.find('\n'), std::string::npos) << "ToString() must be a single line";
+}
 
-  // LogVersion() emits one record per section, so the report is multiline.
-  EXPECT_NE(report.find('\n'), std::string::npos);
+// The typed accessors must agree with the rendered semver string, so a
+// regression in either the CMake regex or the generated header surfaces here
+// instead of in the JSON response.
+TEST(BuildInfoTest, AccessorsMatchSemver) {
+  const auto& info = BuildInfo::Get();
+  const auto prefix = std::format("{}.{}.{}", info.VersionMajor(), info.VersionMinor(), info.VersionPatch());
+  EXPECT_TRUE(info.Semver().starts_with(prefix))
+      << "semver '" << info.Semver() << "' does not start with '" << prefix << "'";
+  EXPECT_EQ(info.IsPrerelease(), !info.PreRelease().empty());
+  EXPECT_EQ(info.IsPrerelease(), info.Semver().contains('-'));
+}
+
+TEST(BuildInfoTest, SemverLooksCanonical) {
+  const auto v = rtos_manager::build::kMetadata.version.semver;
+  ASSERT_FALSE(v.empty());
+  EXPECT_TRUE(IsCanonicalSemver(v)) << "kMetadata.version.semver is not in MAJOR.MINOR.PATCH[-pre.N] form: " << v;
+}
+
+TEST(BuildInfoTest, JsonCarriesDocumentedKeys) {
+  const auto json = BuildInfo::Get().ToJson();
+  ASSERT_FALSE(json.empty());
+  EXPECT_EQ(json.front(), '{');
+  EXPECT_EQ(json.back(), '}');
+
+  // Keys required by api/openapi.yaml#/components/schemas/VersionInfo.
+  for (const auto* key : {"project", "version", "prerelease", "gitHash", "commitCount", "buildType", "cxxStandard"}) {
+    const auto needle = std::format("\"{}\":", key);
+    EXPECT_NE(json.find(needle), std::string::npos) << "missing " << needle << " in " << json;
+  }
+  EXPECT_NE(json.find(BuildInfo::Get().Semver()), std::string::npos);
 }
 
 }  // namespace

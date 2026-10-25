@@ -22,11 +22,11 @@ struct ServerConfig {
 
 /// Logging settings (consumed by easylog in logging.cc).
 struct LogConfig {
-  std::string level{"info"};                ///< trace|debug|info|warning|error|critical
-  std::string file{"logs/rtos-manager.log"}; ///< empty disables the file sink
-  std::uint64_t max_size{10485760};         ///< rotate once the file exceeds N bytes
-  std::size_t max_files{5};                 ///< keep at most N rotated files
-  bool console{true};                       ///< also echo to stdout
+  std::string level{"info"};                  ///< trace|debug|info|warning|error|critical
+  std::string file{"logs/rtos-manager.log"};  ///< empty disables the file sink
+  std::uint64_t max_size{10485760};           ///< rotate once the file exceeds N bytes
+  std::size_t max_files{5};                   ///< keep at most N rotated files
+  bool console{true};                         ///< also echo to stdout
 };
 
 /// Top-level configuration object.
@@ -38,6 +38,6 @@ struct AppConfig {
 /// Load and parse a YAML configuration file into AppConfig.
 /// Missing keys keep the defaults declared above.
 /// @throws std::runtime_error when the file cannot be opened or parsed.
-AppConfig LoadConfig(const std::string& path);
+auto LoadConfig(const std::string& path) -> AppConfig;
 
 }  // namespace rtos_manager

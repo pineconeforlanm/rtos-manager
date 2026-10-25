@@ -101,10 +101,15 @@ protect_breaking_commits = false
 # Filter out the commits matched by the parsers above (skip = true).
 filter_commits = false
 
-# Regex for matching git tags (release tags).
+# Regex for matching git tags (release tags). It intentionally matches
+# `vX.Y.Z-rc.N` as well: release candidates are published artifacts and each one
+# keeps its own section here, so the final release lists only what changed since
+# the last candidate. Do NOT set `skip_tags = "rc"` — that would fold the
+# candidate's commits into the final section and drop that history.
 tag_pattern = "v[0-9].*"
 
-# Regex for skipping tags (e.g., only release tags, no RCs).
+# Regex for skipping tags. Empty on purpose: candidates are part of the release
+# record (see tag_pattern above).
 skip_tags = ""
 
 # Ignore tags that don't match tag_pattern.

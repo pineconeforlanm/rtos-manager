@@ -13,10 +13,9 @@
 //
 //  Built only when RTOS_ENABLE_EXAMPLES=ON; CI compiles but does not run it.
 // ============================================================================
-#include <ylt/coro_http/coro_http_client.hpp>
-
 #include <cstdio>
 #include <string>
+#include <ylt/coro_http/coro_http_client.hpp>
 
 namespace {
 

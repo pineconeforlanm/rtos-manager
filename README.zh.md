@@ -47,34 +47,86 @@ API 契约等工程化钩子。
 
 ```
 rtos-manager/
-├── CMakeLists.txt          # 顶层工程与选项
+├── CMakeLists.txt          # 只写项目元数据与构建图（无任何策略/工具细节）
 ├── CMakePresets.json       # configure/build/test/package/workflow 预设（Conan 感知）
 ├── conanfile.py            # Conan 2 依赖清单
 ├── cliff.toml              # git-cliff 配置（从 Conventional Commits 生成 CHANGELOG）
 ├── cmake/                  # 可复用的 CMake 模块
+│   ├── project_setup.cmake     # 配置期唯一入口：开关、工具链、依赖、工具目标
+│   ├── project_finalize.cmake  # 目标之后的钩子：打包（CPack）+ 汇总
+│   ├── build_options.cmake     # RTOS_ENABLE_* 开关 + 默认构建类型
 │   ├── compiler_options.cmake  # C++26 标准、反射、告警、优化
+│   ├── dependencies.cmake      # Conan 依赖 + 内置 yalantinglibs（rtos::ylt）
 │   ├── version_info.cmake      # Git + semver + 系统/构建元信息 -> version_info.hpp
+│   ├── compile_commands.cmake  # compile_commands.json + 源码根软链（clangd）
 │   ├── coverage.cmake          # gcov/gcovr 插桩 + `coverage` 目标
 │   ├── doxygen.cmake           # `docs` 目标
 │   ├── openapi.cmake           # `openapi` 目标（npx @redocly/cli lint + build-docs）
-│   ├── format.cmake            # clang-format / clang-tidy 便捷目标
 │   ├── changelog.cmake         # git-cliff 生成 CHANGELOG 的 `changelog` 目标
 │   ├── packaging.cmake         # systemd unit + CPack DEB + 维护脚本 + 版本文件
+│   ├── summary.cmake           # configure 汇总输出（rtos_print_build_summary）
 │   └── templates/              # 各类 configure_file 模板（#pragma once + 嵌套命名空间）
-├── include/rtos_manager/   # 公共头文件（version/config/logging/http_server）
-├── src/                    # 核心库 + 可执行文件（CLI 工具 + HTTP 守护进程）
+├── include/rtos_manager/   # 公共头文件（application/cli/version/config/logging/http_server）
+├── src/                    # 核心库 + 可执行文件
+│   ├── main.cc                 # 进程入口：Application::Run(argc, argv)
+│   ├── application.cc          # 启动流水线（请求 → 配置 → 服务）
+│   ├── cli.cc                  # 基于 CLI11 的 CommandLine::Parse
+│   ├── version.cc              # BuildInfo：JSON / 紧凑单行渲染
+│   ├── config.cc               # YAML → AppConfig（glaze 反射）
+│   ├── logging.cc              # easylog 初始化
+│   └── http_server.cc          # coro_http 服务 + GET /api/v1/version
 ├── test/unittest/          # 单元测试（ut_*.cc，GoogleTest + CTest）
 ├── example/                # 示例，每个一个子目录（RTOS_ENABLE_EXAMPLES=ON）
 │   └── api_client/
 │       └── exp_api_client.cc   # coro_http 客户端，访问 GET /api/v1/version
 ├── bench/                  # Google Benchmark（bm_*.cc，RTOS_ENABLE_BENCH）
 ├── docs/                   # Doxygen 配置 + 内置 doxygen-awesome 主题
+├── scripts/                # 开发者工具 —— 刻意放在 CMake 之外
+│   ├── gate.sh                 # 提交门禁：格式化 + Release 全流程 + 覆盖率 ≥ 90%
+│   ├── format.sh               # clang-format 驱动（全仓 / --check / --staged）
+│   ├── build.sh                # 单独跑 Release 构建（-Werror + LTO + 测试）
+│   ├── lint.sh                 # 基于 compile_commands.json 的 clang-tidy 驱动
+│   ├── commit-msg-check.sh     # Conventional Commits 校验
+│   └── install-hooks.sh        # 把 .githooks/* 软链进 .git/hooks
+├── .githooks/              # 版本化的 git 钩子（pre-commit、commit-msg）
+├── .gitmessage             # 提交信息模板（git config commit.template）
 ├── api/
 │   ├── openapi.yaml                              # OpenAPI 3.1 契约（REST 接口唯一来源）
 │   └── rtos-manager.hoppscotch.json          # Hoppscotch 可导入的接口集合
 ├── config/                 # 运行时配置（YAML）
 └── thirdparty/             # 内置依赖：yalantinglibs（coro_http + easylog）
 ```
+
+---
+
+## 分层架构
+
+启动路径是一条单一职责的链：每一层只认识它下面的一层，`main()` 不承载任何逻辑。
+
+```
+main()
+ └─▶ Application::Run(argc, argv)          生命周期：跑哪些阶段、按什么顺序
+      ├─ CommandLine::Parse(argc, argv)    argv  → 请求值对象
+      ├─ LoadConfig(path) -> AppConfig     YAML  → 配置（缺省键回落默认值）
+      └─ RunHttpServer(server_config)      配置  → 套接字（阻塞运行）
+```
+
+| 层 | 类型 | 头文件 | 职责 |
+|----|------|--------|------|
+| 进程入口 | `main()` | `src/main.cc` | 只有 `return Application::Run(argc, argv);` |
+| 生命周期 | `rtos_manager::Application` | `application.hpp` | 阶段顺序、退出码、配置生命周期 |
+| 参数解析 | `rtos_manager::CommandLine` | `cli.hpp` | argv → 请求数据；CLI11 只存在于 `cli.cc` |
+| 配置 | `rtos_manager::AppConfig` | `config.hpp` | YAML → 配置，缺省键回落默认值 |
+| 构建元数据 | `rtos_manager::BuildInfo` | `version.hpp` | 只读访问器 + `ToString()` / `ToJson()` |
+| HTTP 接口 | `RunHttpServer()` | `http_server.hpp` | coro_http 服务、`GET /api/v1/version` |
+
+两条规则保证分层不被破坏：
+
+* **不允许向上调用**：`CommandLine` 不读文件，`BuildInfo` 不打日志，`Application`
+  不拼元信息文案——谁负责这件事（配置、输出、生命周期）就由谁来做。因此 `--version`
+  的输出在 `Application::ShowVersion()` 里，而不是数据类上的某个方法。
+* **数据优于过程**：每个阶段都以值的形式返回结果（`CommandLine`、退出码），
+  而不是改全局状态，因此每一层都能单独测试——见 `test/unittest/ut_cli.cc`。
 
 ---
 
@@ -85,7 +137,13 @@ rtos-manager/
 ```bash
 pip install conan gcovr            # Conan 2 + gcovr
 sudo apt install doxygen ninja-build
-sudo apt install graphviz dpkg-dev # 可选：Doxygen 图 / DEB 自动 shlib 依赖
+# 代码格式化：scripts/format.sh 与 pre-commit 钩子都依赖它
+# （pip --user 会装到 ~/.local/bin；PEP 668 发行版需加
+#  --break-system-packages，或改用 apt install clang-format）
+pip install --user clang-format
+# 可选：scripts/lint.sh 用的 clang-tidy、Doxygen 图用的 graphviz、
+# DEB 自动 shlib 依赖用的 dpkg-dev
+sudo apt install clang-tidy graphviz dpkg-dev
 ```
 
 > `yalantinglibs`（coro_http + easylog）**不是** Conan 包，而是以 git 子模块
@@ -122,6 +180,11 @@ ctest  --preset release
 | `docs`       | Doxygen + OpenAPI 文档渲染                                   |
 | `bench`      | 构建 Google Benchmark 可执行文件                             |
 | `ci-lint`    | clang-tidy 静态分析                                          |
+
+> 格式化**不是** CMake 目标——它由 [`scripts/format.sh`](scripts/format.sh) 承担。
+> 把“格式化 + Release 全流程 + 覆盖率全流程”编排在一起的是
+> [`scripts/gate.sh`](scripts/gate.sh)，pre-commit 钩子直接调用它，详见
+> [开发者工具](#开发者工具)。
 
 ```bash
 cmake --workflow dev            # 本地快速循环
@@ -202,8 +265,19 @@ systemctl status rtos-manager
 
 版本从最近的 Git 标签解析，匹配 `v?MAJOR.MINOR.PATCH[-(alpha|beta|rc).N]`；
 无标签时回退到 `CMakeLists.txt` 里的 `project(... VERSION 0.1.0)`。解析结果会
-编译进二进制，并体现在 DEB 文件名、`/etc/version` 文件以及
-`GET /api/v1/version` 的 JSON 响应里。
+编译进二进制（通过 `rtos_manager::BuildInfo` 访问，数据源自生成的 `constexpr`
+聚合 `rtos_manager::build::kMetadata`），并体现在 DEB 文件名、`/etc/version`
+文件以及 `GET /api/v1/version` 的 JSON 响应里。
+
+DEB 控制字段 `Version:` 同样取自标签，但预发布标识写作 `~` 而不是 `-`：
+`v0.1.2-rc.1` → 文件名 `rtos-manager-0.1.2-rc.1-x86_64.deb`、控制版本
+`0.1.2~rc.1`。这不是美化：dpkg 把**最后一个** `-` 之后看作 Debian 修订号，
+字面的 `0.1.2-rc.1` 会排在 `0.1.2` **之后**，正式版将永远覆盖不了自己的候选版。
+
+正式发版前先用 `-rc.N` 演练一遍，步骤与产物/版本映射见
+[CONTRIBUTING.md](CONTRIBUTING.md#release-candidates-rcn)。RC 同样是发布物：标签打在
+`main` 的发布合并提交上，在 `CHANGELOG.md` 里各自成段（`cliff.toml` 有意让
+`vX.Y.Z-rc.N` 命中 `tag_pattern`），且**一旦推送就不再重打/移动/删除**。
 
 ### OpenAPI 契约
 
@@ -218,12 +292,14 @@ cmake --build build/debug --target openapi            # 两者都做
 
 ### 变更日志（git-cliff）
 
-`CHANGELOG.md` 由 [git-cliff](https://git-cliff.org) 依据 Conventional Commits
-自动生成（配置见 `cliff.toml`）：
+`CHANGELOG.md` 是**生成骨架 + 人工润色**：[git-cliff](https://git-cliff.org) 把上一个
+标签以来的 Conventional Commits 归纳成待发布版本的那一节（配置见 `cliff.toml`），
+发版提交再把它改写成可读说明。不要整体重生成——`-o CHANGELOG.md` 会把历史中手写的
+段落全部替换成机器骨架：
 
 ```bash
-cmake --build build/debug --target changelog            # 重新生成 CHANGELOG.md
-cmake --build build/debug --target changelog-unreleased  # 预览未发布变更
+cmake --build build/debug --target changelog-unreleased  # 只输出待发布版本的那一节
+cmake --build build/debug --target changelog             # 整体重生成（破坏性，仅用于重建）
 ```
 
 ---
@@ -233,9 +309,71 @@ cmake --build build/debug --target changelog-unreleased  # 预览未发布变更
 - C++26，头文件统一使用 `#pragma once`（不再用 `#ifndef` 包含守卫）。
 - 命名空间使用 C++17 嵌套写法：`namespace rtos_manager::build { ... }`。
 - 函数命名遵循 `readability-identifier-naming.FunctionCase: CamelCase`
-  （见 `.clang-tidy`），如 `VersionString()` / `LoadConfig()` / `RunHttpServer()`。
-- 格式化用 `.clang-format`（Google 基础 + 2 空格缩进 / 120 列 / 左对齐指针）：
-  `cmake --build build/debug --target format`，提交前门禁 `format-check`。
+  （见 `.clang-tidy`），如 `BuildInfo::ToJson()` / `LoadConfig()` / `RunHttpServer()`。
+- 返回类型后置：自由函数与方法统一写 `auto name(args) -> R`；局部变量在类型不改变语义时用
+  `auto`（如 `auto text = info.ToString();`）。
+- 格式化由 `.clang-format` 定义（Google 基础 + 2 空格缩进 / 120 列 / 左对齐指针），
+  通过 `scripts/format.sh` 执行，见下节。
+
+### 开发者工具
+
+格式化、静态检查与提交信息规则都在 [`scripts/`](scripts/) 与
+[`.githooks/`](.githooks/) 里，**不在** CMake 构建图中：这些是每个开发者本地的关注点，
+不应拖慢或阻塞一次普通的 `cmake --build`。
+
+```bash
+scripts/install-hooks.sh                   # 每个 clone 执行一次：软链 .githooks/* 到 .git/hooks
+scripts/install-hooks.sh --with-template   # 同时设置 commit.template = .gitmessage
+
+scripts/gate.sh                            # 提交门禁：格式化 + Release + 覆盖率
+scripts/gate.sh --skip-coverage            # 本地快速循环时跳过覆盖率
+scripts/gate.sh --min-coverage 95          # 单次提高到 95% 门槛
+
+scripts/format.sh                          # 就地重排全部源码
+scripts/format.sh --check                  # 门禁：有未格式化文件即非零退出
+scripts/format.sh --staged                 # 只处理暂存区文件（钩子会两遍都跑）
+
+scripts/build.sh                           # 单独跑 Release 构建：-Werror + LTO + 测试
+scripts/build.sh --test                    # 再跑一遍该 preset 的 ctest
+scripts/build.sh --staged                  # 暂存内容与构建无关时自动跳过
+
+scripts/lint.sh                            # clang-tidy 检查 src/*.cc（需已 configure）
+scripts/lint.sh --staged --fix             # 只处理暂存文件，并应用建议修复
+
+scripts/commit-msg-check.sh -m "feat(http): add /healthz"   # 提交前先试消息格式
+```
+
+| 钩子 | 做什么 | 跳过方式 |
+|------|--------|---------|
+| `pre-commit` | 执行 `scripts/gate.sh`：对**全仓**做格式化（暂存文件重新 `git add`，未暂存文件只改工作区；若某个暂存文件同时还有未暂存改动则拒绝），随后跑 Release 全流程与覆盖率全流程并卡 90% 阈值 | `git commit --no-verify` |
+| `commit-msg` | 拒绝 git-cliff 无法归类的消息（`type` 不合法、缺 `(scope):`、超过 72 字符、结尾句号、正文与标题之间没有空行） | `git commit --no-verify` |
+
+门禁在提交前证明两条完整流水线是绿的：
+
+1. **Release** —— `cmake --workflow release`：configure、以“警告即错误 + LTO”编译
+   （比 Debug 严格）、跑完整测试、产出 `.deb`。`-Werror` 回归、漏掉的 include、
+   写坏的 preset 都进不了 `develop`。
+2. **覆盖率** —— `cmake --workflow full`：插桩构建、同一套测试、gcovr 报告，
+   然后由 `gate.sh` 读取 `coverage.xml`，**行覆盖率低于 90% 直接拒绝提交**
+   （失败时打印逐文件表格）。
+
+代价：两段都是 `cmake --workflow`，所以每次都会先 configure；而 configure 会重写
+`version_info.hpp`（里面嵌了构建时间），因此即便没有任何改动，也会有十几个翻译单元
+加一次 LTO 链接被重做。热态下每次提交约一分钟；克隆后第一次提交要跑两遍全量编译，
+以分钟计。
+
+`RTOS_GATE_FORMAT=0`、`RTOS_GATE_RELEASE=0`、`RTOS_GATE_COVERAGE=0` 可按次跳过某一段，
+`RTOS_GATE_MIN_COVERAGE=95` 可提高门槛，`RTOS_PRECOMMIT_LINT=1` 追加对暂存翻译单元的
+clang-tidy。tidy 默认关闭：它要重新解析每个文件，属于 PR 阶段的检查——请用
+`scripts/lint.sh` 或 `cmake --workflow ci-lint`。
+
+不使用 `cpplint` 的原因：它固化的是 *Google* 风格（2 空格缩进、80 列、`.cc`/`.h` 成对），
+与本项目的 `.clang-format` 冲突；它不认识 C++26 语法；而 `clang-tidy` 已经在真实 AST 上
+覆盖了它那些有用的检查（`google-*`、`readability-*`）。多引入一个工具只会多一堆误报，
+以及第二个风格真相来源。
+
+`wip:` / `fixup!` / `squash!` / `amend!` 消息会被放行（本地开发需要），但按
+[CONTRIBUTING.md](CONTRIBUTING.md) 的要求，开 PR 前必须 squash 成规范的提交。
 
 ---
 
@@ -246,6 +384,17 @@ cmake --build build/debug --target changelog-unreleased  # 预览未发布变更
 ```bash
 cmake --workflow full   # configure + build + test + gcovr 报告
 ```
+
+为了让整套测试不依赖端口、线程与 sleep，代码里留了两个接缝：`Application::Run()`
+把服务器后端作为参数接收（`Application::ServerRunner`，默认就是真实的
+`RunHttpServer`），`/api/v1/version` 的处理器抽成了具名函数 `HandleVersionRequest`，
+可以直接喂一个 `coro_http_response` 断言状态码与 JSON 正文。因此启动流程、配置叠加、
+日志级别与 HTTP 载荷都能在单测里覆盖。
+
+覆盖率统计范围是 `src/`，但**排除 `src/main.cc`**（见 `cmake/coverage.cmake`）：
+`main()` 是进程入口，靠“运行二进制”来覆盖而不是单测，计入统计只会让数字变成
+argv 管道的说明。`scripts/gate.sh` 在行覆盖率低于 **90%** 时拒绝提交；逐文件明细在
+`build/coverage/coverage/coverage.txt`。
 
 ## 基准测试
 

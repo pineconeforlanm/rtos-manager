@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  rtos-manager commit message template  (git config --local commit.template .gitmessage)
+#
+#  Every line starting with '#' is stripped by git; the message that gets
+#  recorded is what is left. Keep the subject line as the first non-comment
+#  line: <type>(<scope>): <subject>, imperative, lower-case, no trailing period,
+#  72 characters at most, blank line before any body.
+#
+#  <type>   feat      a new feature                     -> Added
+#           fix       a bug fix                          -> Fixed
+#           docs      documentation only                 -> Documentation
+#           style     formatting, no code change         -> skipped in CHANGELOG
+#           refactor  neither feature nor fix            -> Changed
+#           perf      performance improvement            -> Performance
+#           test      tests only                         -> Testing
+#           build     build system / dependencies        -> Build
+#           ci        CI or tooling configuration        -> skipped in CHANGELOG
+#           chore     maintenance (release commits)      -> skipped in CHANGELOG
+#           revert    revert a previous commit           -> Reverted
+#
+#  <scope>  the module touched: http, config, cli, version, logging, build,
+#           docs, release, ... Omit it only for repo-wide changes.
+#
+#  Body     *why* the change is needed, in plain prose, wrapped at 72 columns.
+#           Bullet lists start with "- ". Reference issues as (#123).
+#
+#  Footer   BREAKING CHANGE: <what breaks and what to do instead>   -> major bump
+#           Refs: #123
+#           Co-authored-by: Name <email>
+#
+#  Examples
+#    feat(http): add GET /healthz endpoint
+#    fix(build): guard git describe when no tags exist
+#    refactor(cli)!: return CommandLine by value instead of filling an out-param
+#
+# ─────────────────────────────────────────────────────────────────────────────

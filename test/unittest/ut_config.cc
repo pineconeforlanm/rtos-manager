@@ -10,6 +10,7 @@
 #include <fstream>
 #include <random>
 #include <string>
+#include <tuple>
 
 #include "rtos_manager/config.hpp"
 
@@ -18,8 +19,8 @@ namespace {
 // Writes `content` to a uniquely-named temporary file and returns its path.
 std::string WriteTempYaml(const std::string& content) {
   std::random_device rd;
-  const auto path = std::filesystem::temp_directory_path() /
-                    ("rtos-manager-config-test-" + std::to_string(rd()) + ".yaml");
+  const auto path =
+      std::filesystem::temp_directory_path() / ("rtos-manager-config-test-" + std::to_string(rd()) + ".yaml");
   std::ofstream out(path);
   out << content;
   out.close();
@@ -64,8 +65,20 @@ TEST(ConfigTest, MissingKeysFallBackToDefaults) {
 }
 
 TEST(ConfigTest, ThrowsOnMissingFile) {
-  EXPECT_THROW(rtos_manager::LoadConfig("/nonexistent/rtos-manager.yaml"),
-               std::runtime_error);
+  EXPECT_THROW(rtos_manager::LoadConfig("/nonexistent/rtos-manager.yaml"), std::runtime_error);
+}
+
+TEST(ConfigTest, ThrowsOnMalformedDocument) {
+  // The file opens fine, so the failure has to come from the parser and carry
+  // the offending position.
+  const auto path = WriteTempYaml("server: [unterminated\n");
+  try {
+    std::ignore = rtos_manager::LoadConfig(path);
+    FAIL() << "expected a parse error";
+  } catch (const std::runtime_error& e) {
+    EXPECT_NE(std::string{e.what()}.find("failed to parse configuration"), std::string::npos);
+    EXPECT_NE(std::string{e.what()}.find(path), std::string::npos);
+  }
 }
 
 }  // namespace

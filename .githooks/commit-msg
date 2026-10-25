@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# =============================================================================
+#  .githooks/commit-msg — reject messages git-cliff cannot classify.
+#
+#  Installed by scripts/install-hooks.sh; the rules live in
+#  scripts/commit-msg-check.sh so they can be tried without committing:
+#    scripts/commit-msg-check.sh -m "feat(http): add /healthz"
+#
+#  `git commit --no-verify` skips this hook (and the pre-commit one).
+# =============================================================================
+set -euo pipefail
+
+# git invokes this through .git/hooks/<name>, a symlink into .githooks/, so the
+# path has to be resolved before its parent's parent can be treated as the root.
+readonly HOOK_PATH="$(realpath -- "${BASH_SOURCE[0]}")"
+readonly ROOT="$(dirname -- "$(dirname -- "$HOOK_PATH")")"
+
+exec bash "$ROOT/scripts/commit-msg-check.sh" "$1"

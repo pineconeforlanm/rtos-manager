@@ -27,6 +27,15 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+# C++26 makes CMake scan every source for module dependencies (CMP0155). On GCC
+# that rewrites the object rule as `-fmodules-ts` + a module mapper, a mode in
+# which the per-object depfile is never produced. The consequence is silent and
+# expensive: editing a header does NOT rebuild the translation units that
+# include it, so an object compiled against an older declaration survives until
+# something touches the .cc file. This project uses no C++ modules, so the scan
+# buys nothing — keep the plain `-MD` depfile path.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 # Map our option onto CMake's built-in warning-as-error (>= 3.24).
 if(RTOS_ENABLE_WARNINGS_AS_ERRORS)
   set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
