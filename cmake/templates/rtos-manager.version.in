@@ -3,7 +3,7 @@ rtos-manager version info
 Package         : @PROJECT_NAME@
 Semantic Version: @RTOS_VERSION_SEMVER@
 Major.Minor.Patch: @RTOS_VERSION_MAJOR@.@RTOS_VERSION_MINOR@.@RTOS_VERSION_PATCH@
-Pre-release     : @RTOS_VERSION_PRE_RELEASE@.@RTOS_VERSION_PRE_NUM@
+Pre-release     : @RTOS_VERSION_PRE_RELEASE_LABEL@
 Is Pre-release  : @RTOS_VERSION_IS_PRERELEASE@
 Git Describe    : @RTOS_GIT_DESCRIBE@
 Git Commit      : @RTOS_GIT_HASH@
