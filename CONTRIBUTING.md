@@ -9,7 +9,7 @@ This guide describes the development workflow for `rtos-manager`. We use
 ## Branch model (Git Flow)
 
 ```
-       feature/...
+       feat/..., fix/..., docs/...
           │  merge back
    ┌──────▼───────┐
    │   develop    │  ← integration branch (daily work, next release)
@@ -23,9 +23,11 @@ This guide describes the development workflow for `rtos-manager`. We use
 | Branch          | Purpose                                                        | Lifetime |
 |-----------------|----------------------------------------------------------------|----------|
 | `main`          | Production-ready code. Every tip is a releasable, tagged SHA.  | forever  |
+|                 | Advances **only** through a `release/*` or `hotfix/*` merge.   |          |
 | `develop`       | Integration branch for the next release. Feature work merges   | forever  |
-|                 | here via pull request.                                         |          |
-| `feature/*`     | New functionality. Branched from and merged into `develop`.    | temporary|
+|                 | here via pull request — never by pushing directly.             |          |
+| `<type>/*`      | Feature, fix or documentation work. Branched from and merged   | temporary|
+|                 | into `develop` through a PR.                                   |          |
 | `release/*`     | Release stabilization. Branched from `develop`, merged into    | temporary|
 |                 | `main` **and** back into `develop`.                            |          |
 | `hotfix/*`      | Urgent fix on production. Branched from `main`, merged into    | temporary|
@@ -34,23 +36,29 @@ This guide describes the development workflow for `rtos-manager`. We use
 ### Naming conventions
 
 ```
-feature/<ticket>-<short-desc>   e.g. feature/RTOS-12-add-http-server
+<type>/<short-desc>             e.g. feat/version-flags, fix/deb-version
 release/<version>               e.g. release/0.2.0
 hotfix/<version>-<short-desc>   e.g. hotfix/0.2.1-fix-port-bind
 ```
 
+The prefix mirrors the Conventional Commit type of the work (`feat`, `fix`,
+`docs`, `build`, `test`, `refactor`), so the branch reads like the commits it
+will carry; `feature/*` is accepted as a synonym of `feat/*`. The description is
+kebab-case with no ticket number — the issue belongs in the PR, not in the ref.
+
 ---
 
-## Day-to-day workflow (feature branch → squash → PR → develop)
+## Day-to-day workflow (branch → PR → develop)
 
-Every change reaches `develop` through a short-lived `feature/*` branch and a
-pull request. Keep history readable: commit freely while working, then
-**squash into a few Conventional Commits before opening the PR**.
+Every change reaches `develop` through a short-lived `<type>/*` branch and a
+pull request; direct commits to `develop` or `main` are not part of the model.
+Keep history readable: commit freely while working, then **squash into a few
+Conventional Commits before opening the PR**.
 
 ```bash
 # 1. Branch off develop
 git checkout develop && git pull
-git checkout -b feature/RTOS-20-tls-support
+git checkout -b feat/version-flags
 
 # 2. Work — commit as often as you like (wip / fix / ... are fine locally)
 git commit -m "wip: sketch tls context"
@@ -63,12 +71,12 @@ git fetch origin && git rebase origin/develop
 git rebase -i origin/develop      # squash/fixup/reword -> e.g. feat(http): ...
 
 # 5. Push and open a PR against develop
-git push -u origin feature/RTOS-20-tls-support
+git push -u origin feat/version-flags
 
 # 6. After the PR is merged, retire the branch
 git checkout develop && git pull
-git branch -d feature/RTOS-20-tls-support
-git push origin --delete feature/RTOS-20-tls-support
+git branch -d feat/version-flags
+git push origin --delete feat/version-flags
 ```
 
 ### Rules
@@ -77,9 +85,15 @@ git push origin --delete feature/RTOS-20-tls-support
   rewrite the pushed history. Address feedback with new commits (or
   `git commit --fixup=<sha>` + `git rebase --autosquash`) and force-update only
   with `git push --force-with-lease` (never bare `--force`).
-- **PR merge strategy:** use a normal *merge* to keep the feature's several
-  Conventional Commits (git-cliff turns each into a CHANGELOG line). Use GitHub's
-  *Squash and merge* only for a single tiny change.
+- **PR merge strategy:** the default is GitHub's *Create a merge commit* (`--no-ff`),
+  because it keeps the branch's several Conventional Commits visible (git-cliff
+  turns each into a CHANGELOG line) and the merge point records that the work went
+  through review. Use *Squash and merge* only for a single tiny change. Never
+  rebase-merge a branch that several people have pulled.
+- **`develop` and `main` only move through the model:** a PR (or, for `main`, a
+  `release/*` / `hotfix/*` merge). If a commit landed on `develop` directly, the
+  fix is a follow-up PR that contains the missing change — not a force-push over
+  shared history.
 - Keep `develop` always releasable-green: before merging, run the full pipeline
   locally — `scripts/gate.sh` (formatting + Release workflow + coverage workflow
   with its 90% threshold). There is no hosted CI; every gate is a local
