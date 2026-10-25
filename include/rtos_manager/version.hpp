@@ -23,7 +23,8 @@ namespace rtos_manager {
 /// (Get()) and nothing to construct, copy or keep alive.
 /// The class owns data and its representations only — it never writes to a
 /// logger or a stream; callers decide where the text goes:
-///   * ToString() — compact single line (startup log, CLI banners)
+///   * ToString() — compact single line (startup log, `-v`)
+///   * ToReport() — full labelled report (`--version`, bug reports)
 ///   * ToJson()   — body of GET /api/v1/version (see api/openapi.yaml)
 class BuildInfo {
  public:
@@ -94,6 +95,10 @@ class BuildInfo {
   // --- Rendering -------------------------------------------------------------
   /// Compact single line, e.g. "0.1.1 (f683f7b on develop, dirty)".
   [[nodiscard]] auto ToString() const -> std::string;
+  /// Full label-aligned report, one field per line, terminated by a newline —
+  /// the `--version` output. Plain text on purpose: no log prefixes, so the
+  /// result stays greppable and diff-stable.
+  [[nodiscard]] auto ToReport() const -> std::string;
   /// JSON body of GET /api/v1/version; the keys mirror
   /// api/openapi.yaml#/components/schemas/VersionInfo.
   [[nodiscard]] auto ToJson() const -> std::string;

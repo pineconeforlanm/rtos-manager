@@ -7,6 +7,7 @@
 // ============================================================================
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <format>
 #include <string>
@@ -70,6 +71,31 @@ TEST(BuildInfoTest, ToStringMentionsGitBranch) {
 TEST(BuildInfoTest, ToStringIsSingleLine) {
   const auto text = BuildInfo::Get().ToString();
   EXPECT_EQ(text.find('\n'), std::string::npos) << "ToString() must be a single line";
+}
+
+TEST(BuildInfoTest, ToReportStartsWithNameAndVersion) {
+  const auto& info = BuildInfo::Get();
+  const auto report = info.ToReport();
+  EXPECT_EQ(report.rfind(std::format("{} {}", info.ProjectName(), info.Semver()), 0), 0)
+      << "ToReport() must open with the same banner the logs use:\n"
+      << report;
+}
+
+TEST(BuildInfoTest, ToReportCarriesEverySection) {
+  const auto report = BuildInfo::Get().ToReport();
+  for (const auto* label : {"description", "homepage", "git", "build", "system", "compiler"}) {
+    EXPECT_NE(report.find(std::format("  {} ", label)), std::string::npos) << label << " missing from:\n" << report;
+  }
+  // Provenance and toolchain are the reason the report exists at all.
+  EXPECT_NE(report.find(BuildInfo::Get().GitHash()), std::string::npos) << report;
+  EXPECT_NE(report.find(std::format("C++{}", BuildInfo::Get().CxxStandard())), std::string::npos) << report;
+}
+
+TEST(BuildInfoTest, ToReportIsMultiLineAndPrintReady) {
+  const auto report = BuildInfo::Get().ToReport();
+  const auto lines = std::count(report.begin(), report.end(), '\n');
+  EXPECT_EQ(lines, 7) << "one line per section plus the banner:\n" << report;
+  EXPECT_EQ(report.back(), '\n') << "the report must end in a newline so it can be printed verbatim";
 }
 
 // The typed accessors must agree with the rendered semver string, so a
