@@ -31,6 +31,11 @@ if(GCOVR_EXECUTABLE AND NOT TARGET coverage)
             --filter "${CMAKE_SOURCE_DIR}/src/.*"
             --exclude "${CMAKE_SOURCE_DIR}/test/.*"
             --exclude "${CMAKE_SOURCE_DIR}/thirdparty/.*"
+            # main() is the process entry point: it is exercised by running the
+            # binary, not by unit tests, so it is out of the coverage base. That
+            # keeps the number a statement about the library, not about argv
+            # plumbing (same documented policy in test/unittest/CMakeLists.txt).
+            --exclude "${CMAKE_SOURCE_DIR}/src/main.cc"
             --html --html-details "${RTOS_COVERAGE_OUTPUT_DIR}/index.html"
             --xml "${RTOS_COVERAGE_OUTPUT_DIR}/coverage.xml"
             --txt "${RTOS_COVERAGE_OUTPUT_DIR}/coverage.txt"

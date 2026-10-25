@@ -25,16 +25,14 @@
 //      ./build/bench/bin/rtos_bench --benchmark_format=json
 // ============================================================================
 #include <benchmark/benchmark.h>
-
-#include <string>
-
-#include <glaze/glaze.hpp>
-#include <glaze/yaml.hpp>
-
 #include <ylt/struct_json/json_reader.h>
 #include <ylt/struct_json/json_writer.h>
 #include <ylt/struct_yaml/yaml_reader.h>
 #include <ylt/struct_yaml/yaml_writer.h>
+
+#include <glaze/glaze.hpp>
+#include <glaze/yaml.hpp>
+#include <string>
 
 #include "rtos_manager/config.hpp"
 

@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 10,
   "cmakeMinimumRequired": {
     "major": 3,
     "minor": 31,
@@ -271,7 +271,7 @@
     },
     {
       "name": "ci-lint",
-      "displayName": "Static analysis (clang-format check + clang-tidy)",
+      "displayName": "Static analysis: clang-tidy over compile_commands.json",
       "steps": [
         { "type": "configure", "name": "tidy" },
         { "type": "build",     "name": "tidy" }
