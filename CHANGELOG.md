@@ -5,6 +5,65 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2-rc.1] - 2026-10-25
+
+First published release candidate. Everything below is what `v0.1.2` will
+contain; it ships early so the packaging, the gate and the version plumbing are
+exercised on a real install. The Debian version of this candidate is
+`0.1.2~rc.1`, which sorts below `0.1.2` — installing the final release later is a
+normal upgrade, not a downgrade.
+
+### Added
+- **`Application` / `CommandLine` split** (`include/rtos_manager/application.hpp`,
+  `cli.hpp`) — `main.cc` is now a delegate. CLI11 sits behind `CommandLine`,
+  which only parses; `Application` owns the lifecycle (version short-circuit →
+  config load → logging init → serve).
+- **`ServerRunner` seam** — the HTTP backend is a
+  `std::function<void(const ServerConfig&)>` defaulting to `RunHttpServer`, so the
+  whole startup path runs in a test without binding a socket.
+- **`HandleVersionRequest`** — the `/api/v1/version` body is a named handler
+  again, assertable with a bare `coro_http_response`.
+- **`scripts/gate.sh` + `.githooks/`** — the commit gate: whole-tree formatting,
+  the Release workflow (warnings-as-errors, LTO, tests, `.deb`) and the coverage
+  workflow with a **90 % line threshold**, from a single entry point
+  (`--skip-*` / `RTOS_GATE_*` for one-off runs).
+- **New test suites** — `ut_application`, `ut_cli`, `ut_logging` and
+  `ut_http_server`: 37 tests, **92.7 %** line coverage over `src/`.
+- `cmake/` is split into focused modules (`project_setup`, `build_options`,
+  `dependencies`, `compile_commands`, `summary`, `project_finalize`).
+
+### Changed
+- **`BuildInfo`** replaces the free functions behind `version.hpp`: one generated
+  `constexpr` aggregate (`rtos_manager::build::kMetadata`) plus a class that
+  renders text and JSON. Anything derivable (e.g. `IsPrerelease()`) is computed
+  instead of being injected twice.
+- **DEB control `Version:` follows the tag** — `v0.1.2-rc.1` becomes
+  `0.1.2~rc.1`, not `0.1.2-rc.1`: dpkg reads the last `-` as the Debian
+  revision, so the dashed form would sort *above* `0.1.2` and the final release
+  could never upgrade over its own candidate.
+- **`/etc/version/rtos-manager.version`** is installed at the documented path; it
+  used to land in `/usr/etc/version` because the destination was resolved
+  relative to the packaging prefix.
+- **Public headers** are installed together with the generated
+  `version_info.hpp`, so downstream `#include <rtos_manager/version.hpp>`
+  compiles.
+- `CMakePresets.json` is back on preset schema 10, and `ci-lint` now runs
+  clang-tidy alone — formatting left the CMake graph.
+
+### Fixed
+- **Header edits no longer leave stale objects.** `CMP0155` made GCC build via
+  `-fmodules-ts` + a module mapper, a mode in which CMake never writes the
+  per-object depfile: editing a header did not rebuild its includers, and the
+  failure only surfaced as an undefined reference at link time.
+  `CMAKE_CXX_SCAN_FOR_MODULES` is now off.
+- **git-cliff no longer aborts on a GitHub API timeout** — every entry point
+  passes `--offline`; the changelog is generated from local history only.
+
+### Removed
+- `cmake/format.cmake` and its `format` / `format-check` targets — formatting,
+  linting and commit validation live in `scripts/`, so `cmake --build` stays a
+  build.
+
 ## [0.1.1] - 2026-10-17
 
 ### Added
@@ -85,5 +144,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the OpenAPI contract at `api/openapi.yaml` is now the live source for the
   HTTP surface.
 
+[0.1.2-rc.1]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.2-rc.1
 [0.1.1]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.1
 [0.1.0]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.0
