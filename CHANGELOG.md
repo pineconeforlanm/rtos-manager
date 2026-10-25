@@ -27,6 +27,11 @@ the Debian version of the final release sorts above its candidate.
   to diff between two builds. The version path no longer initialises logging, so it
   cannot leave a log file behind either.
 
+### Fixed
+- **`/etc/version/rtos-manager.version` said `Pre-release : .0`** on a final
+  release: the field was rendered as `<pre-release>.<n>` unconditionally, and a
+  final tag carries an empty pre-release string. It now reads `none`.
+
 ## [0.1.2-rc.1] - 2026-10-25
 
 First published release candidate. Everything below is what `v0.1.2` will
