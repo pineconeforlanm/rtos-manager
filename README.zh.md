@@ -6,7 +6,7 @@
 <p align="center">
   <img alt="license" src="https://img.shields.io/github/license/pineconeforlanm/rtos-manager?style=flat-square">
   <img alt="language" src="https://img.shields.io/github/languages/top/pineconeforlanm/rtos-manager?style=flat-square">
-  <img alt="version" src="https://img.shields.io/badge/version-0.1.0-orange?style=flat-square">
+  <img alt="version" src="https://img.shields.io/badge/version-0.1.2-orange?style=flat-square">
   <img alt="last commit" src="https://img.shields.io/github/last-commit/pineconeforlanm/rtos-manager?style=flat-square">
 </p>
 
@@ -225,18 +225,33 @@ curl -s http://127.0.0.1:8080/api/v1/version
 ```json
 {
   "project": "rtos_manager",
-  "version": "0.1.0",
-  "gitHash": "e2bffce...",
-  "branch": "develop",
-  "dirty": true,
+  "description": "RTOS Manager — an HTTP service for managing RTOS devices",
+  "homepage": "https://github.com/pineconeforlanm/rtos-manager",
+  "version": "0.1.2",
+  "major": 0,
+  "minor": 1,
+  "patch": 2,
+  "preRelease": "",
   "prerelease": false,
+  "gitHash": "66073cbb1a44401e650f16398702a83aee5a6807",
+  "gitShortHash": "66073cb",
+  "branch": "main",
+  "tag": "v0.1.2",
+  "describe": "v0.1.2",
+  "commitCount": 35,
+  "commitDate": "2026-10-25T17:49:02+08:00",
+  "dirty": false,
   "buildType": "Release",
+  "buildTime": "2026-10-25 09:49:15",
   "system": "Linux",
+  "systemVersion": "6.18.40.1-microsoft-standard-WSL2",
   "processor": "x86_64",
   "compiler": "GNU 16.2.0",
   "cxxStandard": "26"
 }
 ```
+
+上面的取值摘自 `v0.1.2` 的发布产物，为便于阅读做了缩进——实际响应是**单行紧凑 JSON**。
 
 同一请求也打包成了 **Hoppscotch 集合**
 [`api/rtos-manager.hoppscotch.json`](api/rtos-manager.hoppscotch.json)
@@ -267,10 +282,10 @@ systemctl status rtos-manager
 ### 语义化版本
 
 版本从最近的 Git 标签解析，匹配 `v?MAJOR.MINOR.PATCH[-(alpha|beta|rc).N]`；
-无标签时回退到 `CMakeLists.txt` 里的 `project(... VERSION 0.1.0)`。解析结果会
-编译进二进制（通过 `rtos_manager::BuildInfo` 访问，数据源自生成的 `constexpr`
-聚合 `rtos_manager::build::kMetadata`），并体现在 DEB 文件名、`/etc/version`
-文件以及 `GET /api/v1/version` 的 JSON 响应里。
+完全找不到可用的标签时，才回退到 `CMakeLists.txt` 里的 `project(... VERSION ...)`。
+解析结果会编译进二进制（通过 `rtos_manager::BuildInfo` 访问，数据源自生成的
+`constexpr` 聚合 `rtos_manager::build::kMetadata`），并体现在 DEB 文件名、
+`/etc/version` 文件以及 `GET /api/v1/version` 的 JSON 响应里。
 
 DEB 控制字段 `Version:` 同样取自标签，但预发布标识写作 `~` 而不是 `-`：
 `v0.1.2-rc.1` → 文件名 `rtos-manager-0.1.2-rc.1-x86_64.deb`、控制版本
@@ -286,17 +301,20 @@ DEB 控制字段 `Version:` 同样取自标签，但预发布标识写作 `~` �
 
 ```bash
 $ rtos-manager -v          # 一行：装完包先看它
-rtos_manager 0.1.2-rc.1 (c2a0dff on main)
+rtos_manager 0.1.2 (66073cb on main)
 
 $ rtos-manager --version   # 全量：贴进 issue
-rtos_manager 0.1.2-rc.1
+rtos_manager 0.1.2
   description : RTOS Manager — an HTTP service for managing RTOS devices
   homepage    : https://github.com/pineconeforlanm/rtos-manager
-  git         : v0.1.2-rc.1 [hash=c2a0dff… branch=main tag=v0.1.2-rc.1 commits=28 dirty=false date=…]
-  build       : type=Release time=2026-10-25 09:20:28 UTC
-  system      : Linux 6.18.40 (x86_64)
+  git         : v0.1.2 [hash=66073cb… branch=main tag=v0.1.2 commits=35 dirty=false date=2026-10-25T17:49:02+08:00]
+  build       : type=Release time=2026-10-25 09:49:15 UTC
+  system      : Linux 6.18.40.1-microsoft-standard-WSL2 (x86_64)
   compiler    : GNU 16.2.0 (C++26)
 ```
+
+上面的数字来自 `v0.1.2` 的发布产物；在自己工作区里构建，看到的会是当前分支、
+当前提交和 `dirty=true`。
 
 ### OpenAPI 契约
 
