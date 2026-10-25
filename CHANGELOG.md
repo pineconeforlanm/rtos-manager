@@ -5,6 +5,28 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-10-25
+
+Everything in `0.1.2-rc.1` (below) ships in this package; this section lists only
+what changed after that tag. Installing it over `0.1.2~rc.1` is a normal upgrade —
+the Debian version of the final release sorts above its candidate.
+
+### Added
+- **`-v` and `--version` are two flags again** (`cli.hpp`, `cli.cc`). They used to
+  be one flag with two names, so the short form was unreachable. `-v` now prints a
+  single line — `rtos_manager 0.1.2 (c2a0dff on main)` — which is what a
+  post-install check or a log line wants; `--version` keeps the full labelled
+  report and wins when both are given.
+- **`BuildInfo::ToReport()`** — the multi-line report as a string, next to
+  `ToString()` and `ToJson()`. Rendering stays in the data class, printing stays
+  in `Application`.
+
+### Changed
+- **The version output is plain stdout.** It went through easylog, so every field
+  carried a `[timestamp] INFO [pid] [file:line]` prefix — hard to grep, impossible
+  to diff between two builds. The version path no longer initialises logging, so it
+  cannot leave a log file behind either.
+
 ## [0.1.2-rc.1] - 2026-10-25
 
 First published release candidate. Everything below is what `v0.1.2` will
@@ -144,6 +166,7 @@ normal upgrade, not a downgrade.
   the OpenAPI contract at `api/openapi.yaml` is now the live source for the
   HTTP surface.
 
+[0.1.2]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.2
 [0.1.2-rc.1]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.2-rc.1
 [0.1.1]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.1
 [0.1.0]: https://github.com/pineconeforlanm/rtos-manager/releases/tag/v0.1.0
