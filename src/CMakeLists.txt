@@ -9,6 +9,7 @@
 # as plain INTERFACE includes. Re-tag them SYSTEM so the compiler silences
 # diagnostics coming from those third-party headers.
 foreach(_rtos_dep glaze::glaze CLI11::CLI11 yalantinglibs
+                  libpqxx::pqxx redis++::redis++_static
                   GTest::gtest GTest::gmock GTest::gtest_main
                   benchmark::benchmark benchmark::benchmark_main)
   if(TARGET ${_rtos_dep})
@@ -48,13 +49,18 @@ target_include_directories(rtos_manager_core
 # and the tests, which also emit logs / register handlers directly.
 # CLI11 stays PRIVATE: it is an implementation detail of cli.cc, invisible to
 # anyone consuming CommandLine (see include/rtos_manager/cli.hpp).
+# The DB clients are PRIVATE too: nothing in the public headers exposes libpqxx /
+# redis++ types yet, so consumers of rtos::core never see them (they will move to
+# PUBLIC the moment a public type crosses the boundary).
 target_link_libraries(rtos_manager_core
   PUBLIC
     rtos::ylt
     rtos::project_options
   PRIVATE
     glaze::glaze
-    CLI11::CLI11)
+    CLI11::CLI11
+    libpqxx::pqxx
+    redis++::redis++_static)
 
 rtos_add_default_warnings(rtos_manager_core)
 

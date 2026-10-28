@@ -105,5 +105,11 @@ Testing/
 *.bak
 *.swp
 
+# ---------------------------------------------------------------------------
+# Docker compose local overrides — real credentials live here, never commit.
+# The committed template is docker/docker-compose.env.example.
+# ---------------------------------------------------------------------------
+docker/.env
+
 # vcpkg
 vcpkg_installed/

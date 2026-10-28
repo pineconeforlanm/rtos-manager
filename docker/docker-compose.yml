@@ -1,0 +1,98 @@
+# ============================================================================
+#  docker/docker-compose.yml — local infrastructure the service depends on
+#
+#  This stack provides ONLY the backing stores (Redis + PostgreSQL); the
+#  rtos-manager binary itself is built and run by the CMake/Conan toolchain
+#  (see CONTRIBUTING.md), not containerised here. Point the app at these
+#  services with the connection strings exposed below.
+#
+#  Start:   docker compose -f docker/docker-compose.yml up -d
+#  Stop:    docker compose -f docker/docker-compose.yml down
+#  Wipe:    docker compose -f docker/docker-compose.yml down -v   (drops volumes)
+#  Logs:    docker compose -f docker/docker-compose.yml logs -f <service>
+#
+#  Credentials come from docker/.env (compose auto-loads the .env that sits next
+#  to this file). Copy docker/docker-compose.env.example to docker/.env to
+#  override. Every value has a dev-only default so `up` works with no
+#  configuration — change them for anything beyond localhost.
+#
+#  Host reachability: ports bind to 127.0.0.1 only, so a developer's psql /
+#  redis-cli can connect but the daemons are never exposed on the LAN. Remove
+#  the "127.0.0.1:" prefix to publish on all interfaces.
+# ============================================================================
+
+name: rtos-manager-infra
+
+services:
+  # -------------------------------------------------------------------------
+  #  Redis — cache / session / lightweight queue store.
+  #  Pinned to the 8.x line (current major; the tag rolls to the newest 8.x).
+  #  Redis 8 is tri-licensed (RSALv2 / SSPLv1 / AGPLv3) — fine for internal use.
+  #  AOF (appendonly) is on so data survives a container restart; requirepass
+  #  matches the REDIS_PASSWORD handed to the app.
+  # -------------------------------------------------------------------------
+  redis:
+    image: redis:8-alpine
+    container_name: rtos-manager-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:-rtos_redis_dev}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-rtos_redis_dev}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-rtos_redis_dev}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - rtos-infra
+
+  # -------------------------------------------------------------------------
+  #  PostgreSQL — primary relational store.
+  #  Pinned to the 18.x line (current major; the tag rolls to the newest 18.x).
+  #  Note: from PG 18 the image's PGDATA is version-specific, but the named
+  #  volume mounted at /var/lib/postgresql/data still initialises correctly.
+  #  POSTGRES_* create the database/user at first init. Extra schema can be
+  #  dropped into docker/initdb/ (*.sql / *.sh run once, in alphabetical order,
+  #  only when the data volume is empty).
+  # -------------------------------------------------------------------------
+  postgres:
+    image: postgres:18-alpine
+    container_name: rtos-manager-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rtos_manager}
+      POSTGRES_USER: ${POSTGRES_USER:-rtos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rtos_pg_dev}
+      # Stable, locale-independent initdb output across host platforms.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rtos} -d ${POSTGRES_DB:-rtos_manager}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - rtos-infra
+
+volumes:
+  redis-data:
+  pg-data:
+
+networks:
+  rtos-infra:
+    driver: bridge
