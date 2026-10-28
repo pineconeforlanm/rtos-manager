@@ -15,6 +15,8 @@ Dependencies (via Conan):
   * benchmark  — Google Benchmark micro-benchmarks (RTOS_ENABLE_BENCH).
   * openssl    — TLS backend for coro_http (YLT_ENABLE_SSL=ON).
   * liburing   — io_uring network backend for coro_http (YLT_ENABLE_IO_URING=ON).
+  * libpqxx    — PostgreSQL C++ client (backs the docker/docker-compose.yml store).
+  * redis-plus-plus — Redis C++ client (built on hiredis; same compose stack).
 
 Note: the HTTP backend (coro_http) and the logging framework (easylog) both
 come from yalantinglibs, which is vendored as a git submodule under
@@ -44,6 +46,12 @@ class RtosManagerConan(ConanFile):
         # YLT_ENABLE_IO_URING are ON (see thirdparty/CMakeLists.txt).
         self.requires("openssl/[>=3 <4]")
         self.requires("liburing/[>=2.3 <3]")
+        # Database clients for the Redis + PostgreSQL stack the service will
+        # depend on (see docker/docker-compose.yml). Both pull their own
+        # transitive deps: libpqxx -> libpq -> openssl; redis-plus-plus ->
+        # hiredis. Static by default, matching the openssl/liburing posture.
+        self.requires("libpqxx/8.0.2")          # libpqxx::pqxx
+        self.requires("redis-plus-plus/1.3.15")  # redis++::redis++_static
         # Test / benchmark frameworks (gated at the CMake level, always fetched).
         self.requires("gtest/1.18.0")
         self.requires("benchmark/1.9.5")
