@@ -292,9 +292,10 @@ DEB 控制字段 `Version:` 同样取自标签，但预发布标识写作 `~` �
 `0.1.2~rc.1`。这不是美化：dpkg 把**最后一个** `-` 之后看作 Debian 修订号，
 字面的 `0.1.2-rc.1` 会排在 `0.1.2` **之后**，正式版将永远覆盖不了自己的候选版。
 
-正式发版前先用 `-rc.N` 演练一遍，步骤与产物/版本映射见
-[CONTRIBUTING.md](CONTRIBUTING.md#release-candidates-rcn)。RC 同样是发布物：标签打在
-`main` 的发布合并提交上，在 `CHANGELOG.md` 里各自成段（`cliff.toml` 有意让
+预发布 `-rc.N` 全部打在 `develop` 上；正式版是把**最后一次预发布**（develop 上最新的
+`-rc.N` commit）直接合并到 `main` 并打无后缀 tag（而非 develop 的移动 tip）。步骤与产物/版本映射见
+[CONTRIBUTING.md](CONTRIBUTING.md#pre-releases-on-develop)。RC 同样是发布物：标签打在
+`develop`，在 `CHANGELOG.md` 里各自成段（`cliff.toml` 有意让
 `vX.Y.Z-rc.N` 命中 `tag_pattern`），且**一旦推送就不再重打/移动/删除**。
 
 两档输出（都直接写 stdout，不带日志前缀）：
