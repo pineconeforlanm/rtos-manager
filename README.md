@@ -300,11 +300,11 @@ values are baked into:
 - `/etc/version/rtos-manager.version`
 - the HTTP `GET /api/v1/version` JSON response (`prerelease: true|false`)
 
-Tag commits according to Git Flow (see `CONTRIBUTING.md`): `v0.2.0`,
-`v0.2.0-rc.1`, etc. Release candidates are published artifacts too — each one is
-tagged on `main`, keeps its own `CHANGELOG.md` section, and is never retagged;
-the procedure and the artifact/version mapping are in
-[CONTRIBUTING.md](CONTRIBUTING.md#release-candidates-rcn).
+Tag commits according to Git Flow (see `CONTRIBUTING.md`): `v0.2.0` on `main`,
+`v0.2.0-rc.1` on `develop`, etc. Pre-releases are published artifacts too — each
+one is tagged on `develop`, keeps its own `CHANGELOG.md` section, and is never
+retagged; the procedure and the artifact/version mapping are in
+[CONTRIBUTING.md](CONTRIBUTING.md#pre-releases-on-develop).
 
 ### OpenAPI contract
 

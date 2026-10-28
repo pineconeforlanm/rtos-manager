@@ -9,42 +9,43 @@ This guide describes the development workflow for `rtos-manager`. We use
 ## Branch model (Git Flow)
 
 ```
-       feat/..., fix/..., docs/...
-          │  merge back
-   ┌──────▼───────┐
-   │   develop    │  ← integration branch (daily work, next release)
-   └──────┬───────┘
-          │  cut release/...
-   ┌──────▼───────┐        ┌───────────────┐
-   │     main     │◄───────┤  hotfix/...   │  ← production + emergency fixes
-   └──────────────┘        └───────────────┘
+  feat/...  fix/...  docs/...  hotfix/...
+        │  every change merges here through an MR
+   ┌────▼────────┐   pre-releases (vX.Y.Z-rc.N) are tagged HERE
+   │   develop   │──────────────────────────────────────────┐
+   └────┬────────┘                                           │
+        │  an official release merges here through an MR     │
+   ┌────▼───────┐                                            │
+   │    main    │  ← always stable; carries ONLY the final   │
+   └────────────┘     vX.Y.Z tag; no -rc ever lands here     │
 ```
 
 | Branch          | Purpose                                                        | Lifetime |
 |-----------------|----------------------------------------------------------------|----------|
-| `main`          | Production-ready code. Every tip is a releasable, tagged SHA.  | forever  |
-|                 | Advances **only** through a `release/*` or `hotfix/*` merge.   |          |
-| `develop`       | Integration branch for the next release. Feature work merges   | forever  |
-|                 | here via pull request — never by pushing directly.             |          |
-| `<type>/*`      | Feature, fix or documentation work. Branched from and merged   | temporary|
-|                 | into `develop` through a PR.                                   |          |
-| `release/*`     | Release stabilization. Branched from `develop`, merged into    | temporary|
-|                 | `main` **and** back into `develop`.                            |          |
-| `hotfix/*`      | Urgent fix on production. Branched from `main`, merged into    | temporary|
-|                 | `main` and `develop`.                                          |          |
+| `main`          | Always stable. Advances **only** through the final-release     | forever  |
+|                 | merge that promotes the last `-rc.N`, tagged with a final,      |          |
+|                 | suffix-free `vX.Y.Z`. A pre-release tag never appears.          |          |
+| `develop`       | Integration branch. Every `feat/*`, `fix/*`, `docs/*` and       | forever  |
+|                 | `hotfix/*` lands here through an MR. **All `-rc.N` pre-release  |          |
+|                 | tags are cut on `develop`.** Never pushed to directly.          |          |
+| `<type>/*`      | Feature / fix / documentation work. Branch off `develop`,       | temporary|
+|                 | merge back into `develop` through an MR.                        |          |
+| `hotfix/*`      | Urgent production fix. Branch off `main`, land the fix on       | temporary|
+|                 | `develop` through an MR, ship it as the next (patch) release.   |          |
 
 ### Naming conventions
 
 ```
 <type>/<short-desc>             e.g. feat/version-flags, fix/deb-version
-release/<version>               e.g. release/0.2.0
 hotfix/<version>-<short-desc>   e.g. hotfix/0.2.1-fix-port-bind
 ```
 
 The prefix mirrors the Conventional Commit type of the work (`feat`, `fix`,
 `docs`, `build`, `test`, `refactor`), so the branch reads like the commits it
 will carry; `feature/*` is accepted as a synonym of `feat/*`. The description is
-kebab-case with no ticket number — the issue belongs in the PR, not in the ref.
+kebab-case with no ticket number — the issue belongs in the MR, not in the ref.
+There is **no `release/*` branch any more**: a release stabilizes on `develop`
+(tagged there as `-rc.N`), and the final bump promotes the last `-rc.N` onto `main`.
 
 ---
 
@@ -90,10 +91,11 @@ git push origin --delete feat/version-flags
   turns each into a CHANGELOG line) and the merge point records that the work went
   through review. Use *Squash and merge* only for a single tiny change. Never
   rebase-merge a branch that several people have pulled.
-- **`develop` and `main` only move through the model:** a PR (or, for `main`, a
-  `release/*` / `hotfix/*` merge). If a commit landed on `develop` directly, the
-  fix is a follow-up PR that contains the missing change — not a force-push over
-  shared history.
+- **`develop` and `main` only move through the model:** `develop` advances only
+  via a merged `<type>/*` or `hotfix/*` MR; `main` advances **only** via the
+  final-release merge that promotes the last `-rc.N`. If a commit landed on
+  `develop` directly, the fix is a follow-up MR that contains the missing change
+  — not a force-push over shared history.
 - Keep `develop` always releasable-green: before merging, run the full pipeline
   locally — `scripts/gate.sh` (formatting + Release workflow + coverage workflow
   with its 90% threshold). There is no hosted CI; every gate is a local
@@ -216,8 +218,20 @@ overwrite) a release package:
 
 ## Release process
 
-Releases are cut from `develop` through a `release/*` branch. The version lives
-in **two** synchronized places:
+Two kinds of tag, two placement rules:
+
+- A **pre-release** (`vX.Y.Z-rc.N`) is tagged on **`develop`**; `main` never carries
+  a pre-release tag.
+- A **final release** (`vX.Y.Z`, no suffix) is tagged on **`main`**, and `main`
+  advances **only** through the merge that promotes the last `-rc.N` onto it.
+
+The artifact version comes from **the tag**, never from `project(... VERSION ...)`:
+`cmake/version_info.cmake` → `cmake/packaging.cmake` read `git describe`, so the
+checked-out tag decides the `.deb` name and the Debian control `Version:`
+(`vX.Y.Z-rc.N` → `X.Y.Z~rc.N`; `~`, not `-`, so dpkg sorts a candidate *below* the
+final release). Keep both fields at `x.y.z` across the whole `x.y.z` line.
+
+The version number itself lives in **two** synchronized places:
 
 1. `CMakeLists.txt` → `project(... VERSION x.y.z ...)`
 2. `conanfile.py` → `version = "x.y.z"`
@@ -242,65 +256,60 @@ Generation always runs with `--offline`: the template's `commit.remote.*`
 references would otherwise make git-cliff call the GitHub API for author handles,
 and a network timeout aborts the run instead of writing the file.
 
-Steps:
+### Promoting to a final release (last `-rc.N` → `main`)
+
+The final release promotes **the very commit that shipped as the last candidate**
+(`vX.Y.Z-rc.N`) onto `main` — not develop's moving tip — so `main` runs exactly the
+snapshot that was built, installed and verified, and any newer, not-yet-candidated
+`develop` work waits for the next release:
 
 ```bash
-# 1. Cut the release branch from develop
-git checkout develop && git pull
-git checkout -b release/0.2.0
+# 1. Merge the last candidate onto main — the ONLY way main advances. Merge the
+#    rc tag (that exact commit), not develop's tip.
+git checkout main && git pull
+git merge --no-ff v0.2.0-rc.1     # the newest vX.Y.Z-rc.N on develop
 
-# 2. Bump the version in CMakeLists.txt and conanfile.py
-git commit -am "chore(release): prepare 0.2.0"
-
-# 3. Generate the section for this version, then splice it in by hand
-git-cliff --config cliff.toml --offline --unreleased --tag v0.2.0 --strip header
-#    -> review it, enrich it from the commit bodies, paste it into CHANGELOG.md
-#       directly below the header (newest section first)
-git add CHANGELOG.md
-git commit -m "docs(changelog): add 0.2.0 release notes"
-
-# 4. Tag on main after merging the release branch
-git checkout main
-git merge --no-ff release/0.2.0
+# 2. Tag the resulting main merge commit with the clean, suffix-free version.
 git tag -a v0.2.0 -m "Release 0.2.0"
 
-# 5. Back-merge MAIN into develop (this is what carries the tag), retire the branch
+# 3. Back-merge MAIN into develop so the release tag stays reachable from develop.
 git checkout develop
-git merge --no-ff main          # merge main, NOT release/0.2.0 — the tag sits on main's merge commit
-git branch -d release/0.2.0
+git merge --no-ff main
 
-# 6. Publish
+# 4. Publish.
 git push origin main develop --tags
 
-# 7. Point the docs at the release you just shipped
-#    README badges + sample output, api/openapi.yaml info.version and examples,
-#    CONTRIBUTING.md examples — anything still naming the previous version.
+# 5. Build the final artifact from the tag, then open the GitHub Release (NOT
+#    marked pre-release) and attach build/release/rtos-manager-0.2.0-x86_64.deb.
+cmake --workflow release
+
+# 6. Point the docs at the release you just shipped — README badges + sample
+#    output, api/openapi.yaml info.version and examples, this file's examples.
 ```
 
-> **Step 7 is part of the release, not cleanup.** Version strings scattered through
-> the docs are the one thing `scripts/gate.sh` cannot check, and they go stale
-> silently: `v0.1.2` shipped with a `version-0.1.0` README badge, a `0.1.0`
-> `info.version` in `api/openapi.yaml` and sample output from `v0.1.2-rc.1`.
-> Prefer placeholders (`<previous>`) over version literals in instructions that
-> outlive a single release.
+> **Refreshing the docs is part of the release, not cleanup** (step 6). Version
+> strings the gate cannot check go stale silently — `v0.1.2` once shipped with a
+> stale README badge and `info.version` — so after every release point the
+> README, `api/openapi.yaml`, sample output and this file's examples at the
+> version that shipped. Prefer placeholders (`<previous>`) over version literals
+> in instructions that outlive a single release.
 
-> **Why merge `main`, not the release branch?** `v0.2.0` is tagged on the merge
-> commit that step 4 creates on `main`. Back-merging only `release/0.2.0` into
-> `develop` skips that commit, so `git describe --tags` from `develop` cannot
-> find the tag — `tag` shows empty in `/api/v1/version`. Merging `main`
-> **forward** (never rewriting pushed history) makes the tag reachable from
-> `develop` and every branch cut from it.
+> **Why back-merge `main` into `develop`?** `v0.2.0` is tagged on the merge commit
+> the final-release merge creates on `main` — a commit that is not on `develop`. Without
+> merging `main` back, `git describe --tags` on `develop` cannot see `v0.2.0` and
+> `/api/v1/version`'s `tag` field is empty for future develop builds. Merging
+> `main` **forward** (never rewriting pushed history) makes the official tag
+> reachable from `develop` and every branch cut from it.
 
-### Release candidates (`-rc.N`)
+### Pre-releases on `develop`
 
-A release candidate is a **published artifact**, not a local dress rehearsal: this
-project ships `vX.Y.Z-rc.N` whenever a release touches something a changelog
-cannot vouch for (version plumbing, DEB layout, gate or hooks) or when the change
-needs feedback from a real install. A candidate therefore goes through the *same*
-flow as a final release — merge into `main`, tag the merge commit, back-merge
-`main` into `develop`, push the tag, open a GitHub Release marked
-**pre-release** — and differs only in the tag suffix and the Debian control
-version:
+A pre-release (`vX.Y.Z-rc.N`) is a **published artifact**, not a dress rehearsal: ship
+`vX.Y.Z-rc.N` whenever a release touches something a changelog cannot vouch for
+(version plumbing, DEB layout, gate or hooks) or needs feedback from a real
+install. Unlike a final release it lives entirely on **`develop`**: tag the
+chosen develop commit, build from the tag, and open a GitHub Release marked
+**pre-release**. It differs from a final release only in the tag suffix, the
+destination branch and the Debian control version:
 
 | Tag | `.deb` file | control `Version:` |
 |-----|-------------|--------------------|
@@ -315,17 +324,17 @@ never from `project(... VERSION ...)`.
 
 Rules for candidates:
 
-- **Tag on `main`, on the release-merge commit** — every published tag so far
-  (`v0.1.0`, `v0.1.1`, `v0.1.2`) is an annotated tag on
-  `chore(release): merge release/* into main`. Never tag the release-branch tip:
-  the tag must stay reachable from `develop` afterwards, and `main` is the branch
-  every published artifact passes through.
+- **Tag on `develop`.** A pre-release is cut from `develop` and tagged there —
+  never on `main` (it stays pinned to the last official release) and never on a
+  feature branch. Because the tag is on `develop`, it is already reachable from
+  every branch cut from it, so `git describe` resolves it and `/api/v1/version`
+  reports the `-rc.N` tag.
 - **Published tags are immutable.** Once an `-rc.N` is pushed, do not retag, move
   or delete it: the `.deb`, its CHANGELOG section and every installed
-  `/etc/version` file reference it. Fix the defect on the same `release/*` branch
-  and ship `-rc.(N+1)`.
-- **Keep the branch alive** between candidates. `release/0.1.2` stays checked out
-  for the fixes and is retired only after the final `v0.1.2` ships.
+  `/etc/version` file reference it. Fix the defect with a follow-up MR into
+  `develop`, then ship `-rc.(N+1)` from the new develop tip.
+- **`develop` is the candidate line** between releases: keep landing fixes there
+  via MRs and re-tag `-rc.(N+1)`; there is no separate release branch to retire.
 - **Every candidate keeps its CHANGELOG section**, curated like any other
   release. `cliff.toml` deliberately lets `vX.Y.Z-rc.N` match `tag_pattern`; do
   not add `skip_tags = "rc"`. The final release then lists only what changed
@@ -335,17 +344,21 @@ Rules for candidates:
   I/O or serialization.
 
 ```bash
-# Cut the candidate — steps 1-3 above, with the rc name.
-git checkout -b release/0.1.2
-# ... bump CMakeLists.txt + conanfile.py to 0.1.2, commit "chore(release): prepare 0.1.2"
+# Pre-release candidate, cut from develop.
+git checkout develop && git pull
+# Ensure project(...VERSION) / conanfile.py already read the target x.y.z (via an
+# MR), then add the CHANGELOG section for the release:
 git-cliff --config cliff.toml --offline --unreleased --tag v0.1.2-rc.1 --strip header
 #    -> paste (and enrich) the `## [0.1.2-rc.1]` section at the top of CHANGELOG.md
 git commit -am "docs(changelog): add 0.1.2-rc.1 release notes"
 
-# Tag on main (step 4), then build the artifact from the tag.
-git checkout main && git merge --no-ff release/0.1.2
+# Tag THIS develop commit (the candidate), then build the artifact from the tag.
 git tag -a v0.1.2-rc.1 -m "Release 0.1.2-rc.1"
 cmake --workflow release      # -> build/release/rtos-manager-0.1.2-rc.1-x86_64.deb
+
+# Publish only the tag — develop advances solely through MRs, and a pre-release
+# never touches main.
+git push origin v0.1.2-rc.1
 
 # Verify exactly what ops will see: install → run → inspect → roll back.
 sudo apt install ./build/release/rtos-manager-0.1.2-rc.1-x86_64.deb
@@ -359,17 +372,16 @@ curl -s localhost:8080/api/v1/version     # default config, port 8080
 # the candidate sorts above <previous>, hence --allow-downgrades).
 sudo apt install --allow-downgrades ./rtos-manager-<previous>-x86_64.deb
 
-# Carry the tag into develop (step 5) and publish (step 6).
-git checkout develop && git merge --no-ff main
-git push origin main develop --tags
+# Open a GitHub Release for the v0.1.2-rc.1 tag, marked **pre-release**.
 ```
 
 > The tag must exist **before** the build: artifacts take their version from
 > `git describe`, so building first produces a package named after the previous
 > release.
 
-Fix whatever the candidate turns up on `release/0.1.2` and repeat with `-rc.2`;
-the final `vX.Y.Z` is the same flow once more, after which the branch is deleted.
+Fix whatever the candidate turns up with an MR into `develop` and re-tag
+`-rc.(N+1)`; promoting to the final `vX.Y.Z` is the `develop → main` release flow
+above.
 
 The release is produced **locally** (this project has no hosted CI). On the
 release commit / tag, run:
@@ -378,11 +390,12 @@ release commit / tag, run:
 cmake --workflow release      # build + test + package -> build/release/*.deb
 ```
 
-The changelog section is written *before* the tag (step 3), so the notes a
-release points at are exactly the ones reviewed on the release branch.
+The changelog section is written *before* the tag, so the notes a release points
+at are exactly the ones reviewed on `develop`.
 
-Then, if you publish on GitHub, create the Release for the `v0.2.0` tag manually
-and attach the generated `.deb`.
+Then, on GitHub, attach the built `.deb` to the Release for the tag you just
+pushed — mark it **pre-release** for an `-rc.N`, leave it a regular release for a
+final `vX.Y.Z`.
 
 ### Semantic versioning
 
@@ -391,38 +404,49 @@ Given version `MAJOR.MINOR.PATCH`:
 - **MINOR** — backward-compatible new functionality
 - **PATCH** — backward-compatible bug fixes
 
-Pre-release identifiers (`-alpha.1`, `-beta.2`, `-rc.1`) are published from a
-`release/*` branch like any other version — see
-[Release candidates](#release-candidates-rcn) for the tag placement, the Debian
-version mapping and the no-retagging rule.
+Pre-release identifiers (`-alpha.1`, `-beta.2`, `-rc.1`) are tagged on `develop`
+like any other candidate — see
+[Pre-releases on `develop`](#pre-releases-on-develop) for the tag placement, the
+Debian version mapping and the no-retagging rule.
 
 ---
 
 ## Hotfix process
 
+An urgent production fix still reaches `develop` through an MR — `main` never
+takes a direct commit; it only ever advances through the final-release merge that
+promotes the last `-rc.N`. So a hotfix is: branch off the released line, land the
+fix on `develop`, then ship it as a (patch) release.
+
 ```bash
+# 1. Branch the fix off `main` so it carries only released-line history.
 git checkout main && git pull
 git checkout -b hotfix/0.2.1-fix-port-bind
-# fix + test + bump PATCH version + CHANGELOG
-git checkout main && git merge --no-ff hotfix/0.2.1-fix-port-bind
-git tag -a v0.2.1 -m "Hotfix 0.2.1"
-git checkout develop && git merge --no-ff hotfix/0.2.1-fix-port-bind
+# 2. fix + test; bump PATCH in CMakeLists.txt + conanfile.py and add the CHANGELOG
+#    patch section ("fix(...): ..." + "docs(changelog): add 0.2.1 release notes").
+
+# 3. Land it on develop through an MR (base = develop) — exactly like feature work.
+#    Cut an -rc on develop first if the fix needs a real-install check.
+
+# 4. Ship it as a release: promote the last rc onto main (git merge --no-ff
+#    <rc-tag>), tag the merge commit, then back-merge main into develop (see
+#    "Promoting to a final release" above).
+git checkout main && git pull
+git tag -a v0.2.1 -m "Hotfix release 0.2.1"
+git checkout develop && git merge --no-ff main
 git push origin main develop --tags
 ```
 
-That is the *emergency* shape: `main` moves first because installed systems are
-already broken. When a fix batch does not have to be in an operator's hands
-today — documentation, metadata, a defect found while preparing the next
-release — cut the `hotfix/*` branch from `main` all the same, but send it to
-`develop` through a pull request and let the next `release/*` carry it to `main`.
-Nothing is tagged twice, `main` still only advances through a release merge, and
-the batch is reviewed like any other change.
+Routing hotfixes through `develop` keeps `main` a strict subset of released
+history: every fix is reviewed like any other change, nothing is tagged twice,
+`main` only advances through a release merge, and the fix is already on `develop`
+for the next release.
 
 ---
 
 ## Pull request checklist
 
-- [ ] Branch is up to date with its target (`develop` or `main`)
+- [ ] Branch is up to date with its target (`develop`; `main` only for the final-release merge)
 - [ ] `cmake --preset debug && cmake --build --preset debug && ctest --preset debug` passes (Conan deps are auto-installed by the provider at configure time)
 - [ ] `scripts/install-hooks.sh` has been run in this clone (pre-commit + commit-msg active)
 - [ ] `scripts/gate.sh` passes end to end (format + Release workflow + coverage ≥ 90%)
